@@ -1,0 +1,786 @@
+---
+title: "IRIS"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    navbar:
+      - { title: "Accueil", href: "index.html", align: right }
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Type IRIS
+
+## Row {.tabset}
+
+### Types iris
+
+
+
+```{r}
+
+factpal <- colorFactor(topo.colors(4), iris_75$TYP_IRIS)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0.5,weight = 0.8,
+              fillColor  = ~factpal(TYP_IRIS),
+              popup=~paste(CODE_IRIS,NOM_IRIS,TYP_IRIS))%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8,color = "black")
+
+```
+
+### Labels
+
+```{r,eval=FALSE}
+
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0.5,weight = 0.8,
+              fillColor  = ~factpal(TYP_IRIS),
+              popup=~paste(CODE_IRIS,NOM_IRIS,TYP_IRIS))%>%
+  addLabelOnlyMarkers(data=nz_centroid,label= ~htmltools::htmlEscape(paste(CODE_IRIS,"\n",NOM_IRIS,sep = " ")), 
+                      labelOptions = labelOptions(noHide = T, direction = 'top', textOnly = T),
+                      clusterOptions = markerClusterOptions())%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8,color = "black")
+
+
+
+```
+
+### Iris Apur pop
+
+
+
+```{r}
+
+pal_num <- colorNumeric(c("blue","yellow","red"), NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_apur_75,opacity = 1,fillOpacity = 0.5,weight = 0.8,
+              fillColor  = ~pal_num(M2_POP/SHAPE_Leng),
+              popup=~paste(C_IR,L_IR,C_TYPEIR,
+                           "<br>Surface pop: ",M2_POP,
+                           "<br>Surface total: ",SHAPE_Leng))
+
+```
+
+
+### Iris Apur emploi
+
+
+```{r}
+
+pal_num <- colorNumeric(c("blue","yellow","red"), NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_apur_75,opacity = 1,fillOpacity = 0.5,weight = 0.8,
+              fillColor  = ~pal_num(M2_EMP/SHAPE_Leng),
+              popup=~paste(C_IR,L_IR,C_TYPEIR,
+                           "<br>Surface pop: ",M2_EMP,
+                           "<br>Surface total: ",SHAPE_Leng))
+
+```
+
+
+# Revenus
+
+## Row {.tabset}
+
+
+```{r,eval=FALSE}
+# https://www.insee.fr/fr/statistiques/5055909
+# Revenus, pauvreté et niveau de vie en 2018 (Iris)
+
+fildisp_75[,.(.N,m=mean(montant)),by=c("COM","dispd")]%>%
+  ggplot(aes(m,COM,color=dispd))+geom_point()+theme_bw()
+
+# exploration
+
+fildisp_75[COM=="75118",]%>%
+  ggplot(aes(montant,IRIS,color=dispd))+geom_point()+theme_bw()
+
+fildisp_75[COM=="75108",]%>%
+  ggplot(aes(montant,IRIS,color=dispd))+geom_point()+theme_bw()
+
+
+# jointure avec les contours iris
+
+names(iris_75)
+
+iris_75_disp=sp::merge(iris_75,fildisp_75,by.x="CODE_IRIS",by.y="IRIS")
+
+names(iris_75_disp)
+
+
+# leaflet(data = spTransform(paris_iris, CRS("+proj=longlat +datum=WGS84"))) %>% addTiles() %>%
+#   addPolygons(fillColor = topo.colors(10, alpha = NULL), stroke = TRUE)
+
+# 
+# palette <- colorBin(c('#fee0d2',  #an example color scheme. you can substitute your own colors
+#                       '#fcbba1',
+#                       '#fc9272',
+#                       '#fb6a4a',
+#                       '#ef3b2c',
+#                       '#cb181d',
+#                       '#a50f15',
+#                       '#67000d'), 
+#                      bins = c(0, 5, 8, 10, 12, 14, 18, 24, 26))
+
+# popupinfo <- paste0("<strong>Code postal: </strong>", 
+#                       cp.idf$ID, " - ",cp.idf$LIB,
+#                       "<br><strong>Popuplation en 2010: </strong>", 
+#                       trunc(cp.idf$POP2010/1000)," k")
+
+```
+
+### Carto Revenu disp médian - numérique
+
+```{r}
+
+pal_num <- colorNumeric(c("blue","yellow","red"), NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_disp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(DISP_D518),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>","revenu dispo médian: ",DISP_D518))%>%
+  leaflet::addLegend(data=iris_75_disp,position="bottomright",
+                     pal=pal_num,values=~DISP_D518)
+
+```
+
+```{r,eval=FALSE}
+# tentative avec 
+st_coordinates(st_as_sf(iris_75_disp))
+
+iris_75_point_data=st_as_sf(iris_75_disp) %>% 
+  st_point_on_surface() %>% 
+  cbind(., st_coordinates(.)) %>%
+  dplyr::select(x = X, y = Y, DISP_MED18 ) %>%
+  data.table()
+
+iris_75_point_data$geometry=NULL
+
+dfSmoothed <- kernelSmoothing(dfObservations = iris_75_point_data[is.na(DISP_MED18)==F]
+                              , sEPSG = "2154"
+                              , iCellSize = 5L
+                              , iBandwidth = 10000L)
+
+choroLayer(dfSmoothed
+           , var = "DISP_MED18"
+           , nclass = 5
+           , method = "fisher-jenks"
+           , border = NA
+           , legend.title.txt = "prix du SP95 en centimes")
+
+```
+
+```{r,eval=FALSE}
+# https://keen-swartz-3146c4.netlify.app/interpolation.html#a-first-dataset
+
+library(tidyverse)
+no2 = read_csv(system.file("external/no2.csv", package = "gstat"))
+
+library(sf)
+crs = st_crs("EPSG:32632")
+no2.sf = st_as_sf(no2, coords = c("station_longitude_deg", "station_latitude_deg"), crs = "OGC:CRS84") %>%
+    st_transform(crs)
+
+
+```
+
+
+```{r,eval=FALSE}
+
+iris_75_point=st_as_sf(iris_75_disp) %>% 
+  st_point_on_surface()
+
+iris_75_point=subset(iris_75_point,is.na(DISP_MED18)==F)
+
+
+
+```
+
+
+```{r,eval=FALSE}
+ggplot() + geom_sf(data = st_as_sf(iris_75_disp)) +  
+  geom_sf(data = iris_75_point, mapping = aes(col = DISP_MED18))
+
+# build a grid 
+
+library(stars)
+
+st_bbox(st_as_sf(iris_75_disp)) %>%
+  st_as_stars(dx = 10000) %>%
+  st_crop(st_as_sf(iris_75_disp)) -> grd
+grd
+
+bounding_box=st_bbox(st_as_sf(iris_75_disp))
+
+# autres façon
+
+grid <- expand.grid(seq(bounding_box$xmin, bounding_box$xmax, by = 0.002),
+            seq(bounding_box$ymin, bounding_box$ymax, by = .002)) %>%
+  as_tibble() %>%
+  mutate(id = 1:n()) %>%
+  relocate(id) %>%
+  setNames(c("id", "lon","lat"))
+
+coordinates(grid) <- ~ lon + lat
+proj4string(grid) <- proj4string(iris_75)
+
+
+
+library(gstat)
+
+i = idw(DISP_MED18~1, iris_75_point, grid)
+
+ggplot() + geom_stars(data = i, aes(fill = var1.pred, x = x, y = y)) + 
+    geom_sf(data = st_cast(de, "MULTILINESTRING")) + 
+    geom_sf(data = no2.sf)
+
+```
+
+```{r,eval=FALSE}
+# devtools::install_github("EricMarcon/SpatDiv")
+library("SpatDiv")
+plot(spCommunity <- rSpCommunity(n = 1, size = 100, S = 10), which.marks = "PointType")
+
+divAccum <- DivAccum(spCommunity, n.seq = 1:10, q.seq = 0, Individual = TRUE)
+
+library("akima")
+Interpole <- with(divAccum, interp(x = SpCommunity$x, y = SpCommunity$y, 
+    z = Neighborhoods["0", "10", ], xo = seq(from = 0, to = 1, by = 0.01), 
+    yo = seq(from = 0, to = 1, by = 0.01)))
+image(Interpole, col = topo.colors(128, alpha = 1), asp = 1)
+contour(Interpole, add = TRUE)
+with(divAccum, points(x = SpCommunity$x, y = SpCommunity$y, pch = 20))
+
+```
+
+
+```{r,eval=FALSE}
+
+    ## interaction with sp objects:
+    library(sp)
+    ## take 30 sample points out of meuse grid:
+    data(meuse.grid)
+    data(meuse)
+    m0 <- meuse.grid[sample(1:3103,30),]
+    coordinates(m0) <- ~x+y
+    
+     coordinates(meuse) <- ~x+y
+# proj4string(meuse) <- CRS("+init=epsg:28992")
+
+    ## interpolate on this 30 points:
+    ## note: both "meuse" and "m0" are sp objects
+    ## (SpatialPointsDataFrame) !!
+    ## arguments z and xo have to named, y has to be omitted!
+    ipp <- interpp(meuse,z="zinc",xo=m0)
+    plot(ipp)
+    
+    
+iris_75_point_datas <- DivAccum(iris_75_point_data, n.seq = 1:10, q.seq = 0, Individual = TRUE)
+
+Interpole <- with(iris_75_point_datas, interp(x = iris_75_point_data$x, y = iris_75_point_data$y, 
+    z = Neighborhoods["0", "10", ], 
+    xo = seq(from = min(iris_75_point_data$x), to = max(iris_75_point_data$x), by = 0.01), 
+    yo = seq(from = min(iris_75_point_data$y), to = max(iris_75_point_data$y), by = 0.01)))
+image(Interpole, col = topo.colors(128, alpha = 1), asp = 1)
+contour(Interpole, add = TRUE)
+with(iris_75_point_data, points(x = iris_75_point_data$x, y = iris_75_point_data$y, pch = 20))
+
+```
+
+```{r,eval=FALSE}
+
+lzn.vgm <- variogram(log(zinc)~1, meuse) # calculates sample variogram values 
+lzn.fit <- fit.variogram(lzn.vgm, model=vgm(1, "Gau", 900, 1)) # fit model
+
+mean(iris_75_point$DISP_MED18)
+
+v = variogram(DISP_MED18~1, iris_75_point)
+
+plot(v, plot.numbers = TRUE)
+
+```
+
+
+```{r,eval=FALSE}
+
+#  pour revenu
+v0 = variogram(DISP_MED18~1, iris_75_point,cutoff=2)
+plot(v0, plot.numbers = TRUE)
+
+v.m = fit.variogram(v0, vgm(1, "Exp", 1000))
+
+plot(v0, v.m, plot.numbers = TRUE)
+```
+
+
+```{r,eval=FALSE}
+library(raster)
+
+# Generate empty raster layer and rasterize points
+r <- raster(crs = crs(k), vals = 0, resolution = c(0.005, 0.005), ext = extent(c(2.1,2.5,48.7,48.9))) %>%
+   rasterize(k, .)
+
+nc.st = st_rasterize(k, dx = 500, dy = 500)
+
+pal <- colorNumeric(c("#0C2C84", "#41B6C4", "#FFFFCC"), values(r)[,"var1.pred"],
+  na.color = "transparent")
+
+plot(r)
+
+
+leaflet::leaflet() %>% leaflet::addTiles() %>%
+  leaflet::addRasterImage(r, colors = pal, opacity = 0.8) 
+
+
+
+```
+
+### Carto Revenu disp médian - quantile
+
+```{r}
+
+pal_quant <- colorQuantile(c("blue","yellow","red"), NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_disp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_quant(DISP_D518),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>","revenu dispo médian: ",DISP_D518))%>%
+  leaflet::addLegend(data=iris_75_disp,position="bottomright",pal=pal_quant,values=~DISP_D518)
+
+```
+
+### Carto Revenu disp D9
+
+```{r}
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_disp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(DISP_D518),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>","revenu 9e décile: ",DISP_D918))%>%
+  leaflet::addLegend(data=iris_75_disp,position="bottomright",pal=pal_num,values=~DISP_D918)
+
+```
+
+### Tableau de données
+
+```{r}
+fildisp_75[,c("IRIS","LIBIRIS","DISP_MED18","DISP_EQ18","DISP_PPSOC18")]%>%
+  datatable(rownames = F)
+```
+
+# Niveau d'éducation
+
+## Row {.tabset}
+
+### Ratio bac+5 ou plus
+
+
+```{r,eval=FALSE}
+
+
+pal <- colorQuantile(c("blue","yellow","orange","red"), NULL, n = 100)
+
+```
+
+
+
+```{r}
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_diplo,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(ratio),
+              popup=~paste(CODE_IRIS,NOM_IRIS,ratio))
+
+```
+
+### Nombre bac+5 ou plus
+
+```{r,eval=FALSE}
+
+
+iris_75_diplo=sp::merge(iris_75_diplo,iris_data,
+                        by.x="CODE_IRIS","C_IR")
+
+
+```
+
+
+```{r}
+
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_diplo,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(P17_NSCOL15P_SUP5/SHAPE_Area),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",
+                           format(P17_NSCOL15P_SUP5,digits=0)))
+
+```
+
+
+### Données
+
+```{r}
+diplo_75%>%datatable(rownames = F)
+```
+
+# CSP
+
+## Row {.tabset}
+
+### Variables
+
+```{r,eval=FALSE}
+
+csp_var=read.xlsx("../data/insee/base-ic-evol-struct-pop-2017.xlsx",sheet="Variables",startRow = 6, colNames = TRUE,
+                    skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+                    namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()
+names(csp_var)
+
+```
+
+
+```{r}
+csp_var%>%
+  datatable(rownames = F,
+            options = list(pageLength = 10))
+
+```
+
+
+### Données
+
+
+
+
+
+```{r}
+
+
+iris_csp_75[,c("IRIS","LIBIRIS","P17_POP","C17_POP15P","C17_POP15P_CS3","ratio_csp3","M2_POP")]%>%
+  merge(data.table(ban_75_ech_df_iris_csp)[,.(nb_ad=.N),
+                                      by=code_iris],
+        by.x="IRIS",by.y="code_iris")%>%
+  mutate(pop_par_ad=C17_POP15P/nb_ad)%>%
+  mutate(pop_par_m2=C17_POP15P/M2_POP)%>%
+  datatable(rownames = F)%>%
+  formatCurrency(c("P17_POP","C17_POP15P_CS3","C17_POP15P"),
+                 digits = 0,mark = " ",currency ="")%>%
+  formatPercentage(c("ratio_csp3"),digits = 2)
+
+
+
+```
+
+### Cadres - num
+
+```{r,eval=FALSE}
+pal_num <- colorNumeric(c("blue","yellow","red"), NULL, n = 20)
+# 
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(C17_POP15P_CS3/SHAPE_Area),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",format(C17_POP15P_CS3,digits=0)))%>%
+  leaflet::addLegend(data=iris_75_csp,position="bottomright",pal=pal_num,values=~C17_POP15P_CS3)
+
+```
+
+### Cadres ratio - num
+
+```{r}
+pal_num <- colorNumeric(c("blue","yellow","red"), NULL, n = 20)
+# 
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(ratio_csp3),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",format(C17_POP15P_CS3,digits=0),
+                           "<br>",ratio_csp3))%>%
+  leaflet::addLegend(data=iris_75_csp,position="bottomright",pal=pal_num,values=~ratio_csp3)
+
+```
+
+
+
+### Cadres - quantiles
+
+
+```{r,eval=FALSE}
+pal <- colorQuantile(c("blue","yellow","red"), NULL, n = 10)
+# 
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal(C16_POP15P_CS3/SHAPE_Area),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",format(C16_POP15P_CS3,digits=0)))%>%
+  leaflet::addLegend(data=iris_75_csp,position="bottomright",pal=pal,values=~C16_POP15P_CS3)
+
+```
+
+### Cadres ratio - num
+
+```{r}
+pal_num <- colorQuantile(c("blue","yellow","red"), NULL, n = 10)
+# 
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(ratio_csp3),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",format(C17_POP15P_CS3,digits=0),
+                           "<br>",ratio_csp3))%>%
+  leaflet::addLegend(data=iris_75_csp,position="bottomright",pal=pal_num,values=~ratio_csp3)
+
+```
+
+
+### Ouvriers - num
+
+```{r,eval=FALSE}
+pal_num <- colorNumeric(c("blue","yellow","red"), NULL, n = 50)
+# 
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(C16_POP15P_CS6/SHAPE_Area),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",format(C16_POP15P_CS6,digits=0)))%>%
+  leaflet::addLegend(data=iris_75_csp,position="bottomright",pal=pal_num,values=~C16_POP15P_CS6)
+
+```
+
+
+### Ouvriers-quantiles
+
+```{r,eval=FALSE}
+pal <- colorQuantile(c("blue","yellow","red"), NULL, n = 10)
+# 
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal(C16_POP15P_CS6/SHAPE_Area),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",C16_POP15P_CS6))%>%
+  leaflet::addLegend(data=iris_75_csp,position="bottomright",pal=pal,values=~C16_POP15P_CS6)
+
+```
+
+
+### Indép num
+
+```{r,eval=FALSE}
+pal_num <- colorNumeric(c("blue","yellow","red"), NULL, n = 10)
+# 
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(C16_POP15P_CS2/SHAPE_Area),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",format(C16_POP15P_CS2,digits=0)))%>%
+  leaflet::addLegend(data=iris_75_csp,position="bottomright",pal=pal_num,values=~C16_POP15P_CS2)
+
+```
+
+
+### Indép quant
+
+```{r,eval=FALSE}
+pal <- colorQuantile(c("blue","yellow","red"), NULL, n = 10)
+# 
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal(C16_POP15P_CS2/SHAPE_Area),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",C16_POP15P_CS2))%>%
+  leaflet::addLegend(data=iris_75_csp,position="bottomright",pal=pal,values=~C16_POP15P_CS2)
+
+```
+
+
+# Tranches d'âges
+
+## Row {.tabset}
+
+### Tranches
+
+
+```{r}
+
+pop_age_75%>%datatable(rownames = F)%>%
+  formatCurrency(c("P17_POP","P17_POP0014","P17_POP1529","P17_POP3044","P17_POP4559","P17_POP6074","P17_POP75P"),
+                 digits = 0,mark = " ",currency ="")
+
+```
+
+### Tranches %
+
+
+```{r}
+pop_age_75%>%
+  mutate(
+    across(c("P17_POP0014","P17_POP1529","P17_POP3044","P17_POP4559","P17_POP6074","P17_POP75P"),
+           .fns = ~round(./P17_POP,4)))%>%
+  mutate(P17_POP=round(P17_POP,1))%>%
+  datatable(rownames = F,filter = "top")%>%
+  formatPercentage(c("P17_POP0014","P17_POP1529","P17_POP3044","P17_POP4559","P17_POP6074","P17_POP75P"))%>%
+  formatCurrency(c("P17_POP"),
+                 digits = 0,mark = " ",currency ="")
+
+
+```
+
+
+# SIRENE IRIS
+
+## Row {.tabset}
+
+### IRIS associations - quantiles
+
+```{r}
+siret_paris_iris_cj=siret_paris_iris_voies[cj2=="92",.(N=.N,adunique=length(unique(geo_adresse))),by=area]
+
+iris_75_asso=sp::merge(iris_75,siret_paris_iris_cj,
+                        by.x="CODE_IRIS",by.y="area")
+
+```
+
+```{r}
+pal_asso <- colorQuantile(c("blue","yellow","red"), NULL, n = 10)
+# 
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_asso,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_asso(N),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",N))%>%
+  leaflet::addLegend(data=iris_75_asso,position="bottomright",pal=pal_asso,values=~N)
+
+```
+
+### Palette numérique
+
+```{r}
+pal_asso <- colorNumeric(c("blue","yellow","red"), NULL, n = 10)
+# 
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_asso,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_asso(N),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",N))%>%
+  leaflet::addLegend(data=iris_75_asso,position="bottomright",pal=pal_asso,values=~N)
+
+```
+
+
+### Carto points
+
+
+
+```{r}
+
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_asso,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_asso(N),
+              popup=~paste(CODE_IRIS,NOM_IRIS,N))%>%
+  addMarkers(data=siret_paris_iris_voies[cj2=="92",],lng=~longitude,lat=~latitude,
+             clusterOptions = markerClusterOptions()
+             )
+
+```
+
+### Adresses concentration
+
+```{r}
+siret_paris_iris_voies[cj2=="92",.N,by=c("geo_adresse")][order(-N)][1:20]%>%
+  datatable(rownames = F)
+```
+
+### Asso adresses uniques
+
+```{r}
+
+pal_asso_unique <- colorNumeric(c("blue","yellow","red"), NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_asso,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_asso_unique(adunique),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",adunique))%>%
+  addMarkers(data=unique(siret_paris_iris_voies[cj2=="92",c("longitude","latitude","geo_adresse")]),
+             lng=~longitude,lat=~latitude,popup=~geo_adresse,
+             clusterOptions = markerClusterOptions()
+             )%>%
+  leaflet::addLegend(data=iris_75_asso,position="bottomright",pal=pal_asso_unique,values=~adunique)
+
+```
+
+### Cat entreprises
+
+```{r}
+
+iris_cj=siret_paris_iris_voies[,.(.N),by=c("area","categorieEntreprise")]%>%
+  spread(categorieEntreprise,N)
+
+iris_cj%>%datatable(rownames = F)
+
+```
+
+### CJ
+
+
+```{r}
+
+iris_cj=siret_paris_iris_voies[,.(.N),by=c("area","cj1")]%>%
+  spread(cj1,N)
+
+names(iris_cj)=c("Code Iris",paste("CJ1 =",1:9))
+
+
+iris_cj%>%datatable(rownames = F)
+
+```
+
+
+### CJ asso
+
+pour cj2==92, on a aussi des catégories d'entreprises (à voir ce que ça veut dire)
+
+
+```{r}
+
+iris_cj=siret_paris_iris_voies[cj2=="92",.(.N),by=c("area","categorieEntreprise")]%>%
+  spread(categorieEntreprise,N)%>%
+  select(area,GE,ETI,PME,Inconnu)%>%
+  replace(is.na(.),0)%>%
+  mutate(total=ETI+GE+PME+Inconnu)
+
+iris_cj%>%datatable(rownames = F)
+
+```
+
+
+### PME à Paris
+
+```{r}
+
+iris_cj=siret_paris_iris_voies[cj1=="5" & categorieEntreprise=="PME",.(.N),by=c("naf2.y")]%>%
+  merge(nafc,by.x="naf2.y",by.y="Code")%>%
+  select(naf2.y,Libelle,N)
+
+iris_cj%>%datatable(rownames = F)
+
+```
+
+### PME par iris
+
+A faire quand les codes NAF seront choisis
+
+
+```{r,eval=FALSE}
+
+iris_cj=siret_paris_iris_voies[cj1=="5" & categorieEntreprise=="PME",.(.N),by=c("area","naf2.y")]
+
+iris_cj%>%datatable(rownames = F)
+
+```
+

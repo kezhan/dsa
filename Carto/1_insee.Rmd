@@ -1,0 +1,1147 @@
+
+
+
+# Comparateur CP
+
+## nettoyage
+
+```{r}
+comp=read.csv2("../data/base_cc_comparateur.csv",dec=".")%>%data.table()
+```
+
+
+```{r}
+var_selec=c("P17_POP","P12_POP","SUPERF","NAIS1217","DECE1217","P17_MEN","NAISD19","DECESD19","P17_LOG",
+            "P17_RP","P17_RSECOCC","P17_LOGVAC","P17_RP_PROP","NBMENFISC17","PIMP17","MED17","TP6017","P17_EMPLT",
+            "P17_EMPLT_SAL","P12_EMPLT","P17_POP1564","P17_CHOM1564","P17_ACT1564","ETTOT15","ETAZ15","ETBE15","ETFZ15","ETGU15","ETGZ15","ETOQ15",
+            "ETTEF115","ETTEFP1015")
+
+for (n in var_selec){
+  comp[[n]]=as.numeric(comp[[n]])
+}
+```
+
+
+```{r}
+comp$dpop17=comp$P17_POP/comp$SUPERF
+comp$dpop12=comp$P12_POP/comp$SUPERF
+comp$tnai17=comp$NAIS1217/comp$P17_POP
+comp$dlog17=comp$P17_LOG/comp$SUPERF
+comp$trp17=comp$P17_RP/comp$P17_LOG
+
+comp$tchom=comp$P17_CHOM1564/comp$P17_ACT1564
+```
+
+```{r}
+comp$etpsurf=comp$ETTOT15/comp$SUPERF
+comp$etppop=comp$ETTOT15/comp$P17_POP
+
+comp$tETAZ15=comp$ETAZ15/comp$ETTOT15
+comp$tETBE15=comp$ETBE15/comp$ETTOT15
+comp$tETFZ15=comp$ETFZ15/comp$ETTOT15
+comp$tETGU15=comp$ETGU15/comp$ETTOT15
+comp$tETGZ15=comp$ETGZ15/comp$ETTOT15
+comp$tETOQ15=comp$ETOQ15/comp$ETTOT15
+comp$tETTEF115=comp$ETTEF115/comp$ETTOT15
+comp$tETTEFP1015=comp$ETTEFP1015/comp$ETTOT15
+
+```
+
+
+## Par code postal
+
+si la jointure se fait par code postal, on peut faire une aggrégation par code postal.
+Mais dans le fichier de sirene, on a le code insee
+
+
+```{r}
+
+cpinsee=read.csv2("../data/correspondance-code-insee-code-postal.csv")%>%data.table()
+
+```
+
+```{r}
+comp=merge(comp,cpinsee,by.x="CODGEO",by.y="Code.INSEE")
+
+comp[,.N,by=Code.Postal]
+
+```
+
+```{r}
+comp[Code.Postal=="10200"]
+```
+
+
+```{r}
+comp_cp=comp[,.(dpop17=mean(dpop17),
+                dpop12=mean(dpop12),
+                tnai17=mean(tnai17),
+                dlog17=mean(dlog17),
+                trp17=mean(trp17),
+                tchom=mean(tchom),
+                med=mean(MED17)),
+             by=Code.Postal]
+```
+
+
+```{r}
+names(comp_cp)
+```
+
+
+## jointure avec siret
+
+on fait une jointure pour avoir des infos insee pour les établissements
+
+```{r}
+
+siret_comp=merge(siret,
+          comp,
+          by.x="codeCommuneEtablissement",
+          by.y="Code.Postal",
+          all.x=T)
+
+```
+
+```{r}
+names(siret_comp)
+```
+
+## Aggrégation SIREN
+
+Pour une entreprise, on fait une aggrégation
+
+```{r}
+siren_comp=siret_comp[,.(net=.N,
+                         anc=mean(ancien,na.rm=T),
+                         dpop17=mean(dpop17,na.rm=T),
+                         dpop12=mean(dpop12,na.rm=T),
+                         tnai17=mean(tnai17,na.rm=T),
+                         dlog17=mean(dlog17,na.rm=T),
+                         trp17=mean(trp17,na.rm=T),
+                         tchom=mean(tchom,na.rm=T),
+                         MED17=mean(MED17,na.rm=T),
+                         TP6017=mean(TP6017,na.rm=T),
+                         etpsurf=mean(etpsurf,na.rm=T),
+                         etppop=mean(etppop,na.rm=T),
+                         tETAZ15=mean(tETAZ15,na.rm=T),
+                         tETBE15=mean(tETBE15,na.rm=T),
+                         tETFZ15=mean(tETFZ15,na.rm=T),
+                         tETGU15=mean(tETGU15,na.rm=T),
+                         tETGZ15=mean(tETGZ15,na.rm=T),
+                         tETOQ15=mean(tETOQ15,na.rm=T),
+                         tETTEF115=mean(tETTEF115,na.rm=T),
+                         tETTEFP1015=mean(tETTEFP1015,na.rm=T),
+                         P17_POP=sum(P17_POP,na.rm=T),
+                         SUPERF=sum(SUPERF,na.rm=T),
+                         P12_POP=sum(P12_POP,na.rm = T),
+                         NAIS1217=sum(NAIS1217,na.rm = T),
+                         DECE1217=sum(DECE1217,na.rm = T),
+                         P17_MEN=sum(P17_MEN,na.rm = T),
+                         NAISD19=sum(NAISD19,na.rm=T),
+                         DECESD19=sum(DECESD19,na.rm = T),
+                         P17_LOG=sum(P17_LOG,na.rm=T),
+                         P17_LOGVAC=sum(P17_LOGVAC,na.rm=T),
+                         ETAZ15=sum(ETAZ15,na.rm=T),
+                         ETBE15=sum(ETBE15,na.rm=T),
+                         ETFZ15=sum(ETFZ15,na.rm=T),
+                         ETGU15=sum(ETGU15,na.rm=T),
+                         ETGZ15=sum(ETGZ15,na.rm=T),
+                         ETOQ15=sum(ETOQ15,na.rm=T)),
+                      by=siren]
+
+
+```
+
+
+
+# IRIS
+
+## Iris
+
+données venant d'apur (Paris)
+
+```{r}
+iris_data=iris_apur@data%>%data.table()
+iris_data$C_IR=as.character(iris_data$C_IR)
+```
+
+```{r}
+
+iris_data=iris_data%>%
+  mutate(totalm2=M2_POP+M2_EMP-M2_IP,
+         testp=totalm2/SHAPE_Area,
+         pstat=M2_IP/SHAPE_Area,
+         ppop=M2_POP/SHAPE_Area,
+         pemp=M2_EMP/SHAPE_Area)
+
+datatable(iris_data[substr(C_CAINSEE,1,2)=="75",
+                    c("C_IR","L_IR","pstat","ppop","pemp")])
+
+```
+
+```{r}
+
+sum(iris_data[substr(C_CAINSEE,1,2)=="75"]$SHAPE_Area)
+sum(iris_data[substr(C_CAINSEE,1,2)=="75"]$totalm2)
+sum(iris_data[substr(C_CAINSEE,1,2)=="75"]$M2_IP)
+
+sum(iris_data[substr(C_CAINSEE,1,2)=="75"]$M2_POP)/sum(iris_data[substr(C_CAINSEE,1,2)=="75"]$SHAPE_Area)
+sum(iris_data[substr(C_CAINSEE,1,2)=="75"]$M2_EMP)/sum(iris_data[substr(C_CAINSEE,1,2)=="75"]$SHAPE_Area)
+
+
+iris_data[substr(C_CAINSEE,1,2)=="75",.(sum(SHAPE_Area)),
+          by="C_CAINSEE"]
+
+```
+
+
+## Revenu
+
+```{r}
+fildisp=read.xlsx("../data/insee/BASE_TD_FILO_DISP_IRIS_2018.xlsx",startRow = 6, colNames = TRUE,
+                    skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+                    namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()
+
+fildisp$DISP_D518=fildisp$DISP_MED18
+
+fildisp_75=fildisp[substr(COM,1,2)=="75",]
+
+fildisp_75_g=gather(fildisp[substr(COM,1,2)=="75",
+                            c("IRIS","LIBIRIS","COM",paste0("DISP_D",1:9,"18"))],
+                    "dispd","montant",-c("IRIS","LIBIRIS","COM"))%>%data.table()
+```
+
+déclaration et disponible
+
+```{r}
+fildec=read.xlsx("../data/insee/BASE_TD_FILO_DEC_IRIS_2018.xlsx",startRow = 6, colNames = TRUE,
+                    skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+                    namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()
+
+filo=fildec%>%
+  select(-LIBIRIS,-COM,-LIBCOM)%>%
+  merge(fildisp,by="IRIS")
+
+filo_75=filo[substr(COM,1,2)=="75",]
+
+```
+
+
+Fusion avec le reste
+
+```{r}
+filo_75=filo_75%>%
+  select(-LIBIRIS,-COM,-LIBCOM)
+```
+
+
+```{r}
+iris_csp_75=csp_75%>%
+  merge(iris_75_df_data,
+        by.y="C_IR",
+        by.x="IRIS")%>%
+  mutate(densite_C17_POP15P=C17_POP15P/M2_POP)
+
+
+
+write.csv2(iris_csp_75,file="iris_csp_75.csv",sep=";")
+
+```
+
+
+```{r}
+iris_csp_filo_75=iris_csp_75%>%
+  merge(filo_75,by.x="C_IR",by.y="IRIS")
+
+write.csv2(iris_csp_filo_75,file="iris_csp_filo_75.csv",sep=";")
+
+```
+
+pour toute la France
+
+```{r}
+iris_csp_filo=csp%>%
+  merge(iris_data,
+        by.y="C_IR",
+        by.x="IRIS")%>%
+  mutate(densite_C17_POP15P=C17_POP15P/M2_POP)%>%
+  merge(filo,by="IRIS")
+
+write.csv2(iris_csp_filo,file="iris_csp_filo.csv")
+
+```
+
+
+## Formation
+
+```{r}
+# https://www.insee.fr/fr/statistiques/5055909
+# Revenus, pauvreté et niveau de vie en 2018 (Iris)
+
+diplo=read.xlsx("../data/insee/base-ic-diplomes-formation-2017.xlsx",startRow = 6, colNames = TRUE,
+                    skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+                    namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()
+
+
+diplo_75=diplo[substr(COM,1,2)=="75",c("IRIS","LIBIRIS","TYP_IRIS","P17_NSCOL15P_SUP5","P17_POP1517",
+                                       "P17_POP1824",
+                                       "P17_POP2529",
+                                       "P17_POP30P")]%>%
+  mutate(ratio=P17_NSCOL15P_SUP5/(P17_POP1517+P17_POP1824+P17_POP2529+P17_POP30P))
+
+
+iris_75_diplo=sp::merge(iris_75,diplo_75,by.x="CODE_IRIS",by.y="IRIS")
+names(diplo)
+
+```
+
+## Logements
+
+```{r}
+
+logmt=read.xlsx("../data/insee/base-ic-logement-2016.xlsx",startRow = 6, colNames = TRUE,
+                    skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+                    namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()
+
+
+```
+
+
+## Densité
+
+
+```{r,eval=FALSE}
+# jointure densité
+
+
+iris_csp_75=iris_75_data%>%
+  mutate(C_IR=as.character(C_IR))%>%
+  merge(csp_75,by.x="C_IR",by.y="IRIS")%>%
+  mutate(densite_C17_POP15P=C17_POP15P/M2_POP,
+         densite_P17_POP=P17_POP/M2_POP)
+
+iris_csp_75[densite_C17_POP15P>0.5,densite_C17_POP15P:=0]
+
+
+sort(unique(iris_csp_75$densite_C17_POP15P),decreasing = T)
+
+
+# carte densite
+
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addCircles(data=ban_75_ech_df_iris_csp,radius = 1,
+             color = ~pal_num(densite_C17_POP15P))%>%
+  leaflet::addLegend(data=ban_75_ech_df_iris_csp,position="bottomright",
+                     pal=pal_num,values=~densite_C17_POP15P,title ="Valeur")
+
+
+
+```
+
+
+
+# CSP
+
+## Données
+
+```{r,eval=FALSE}
+
+csp=read.xlsx("../data/insee/base-ic-evol-struct-pop-2017.xlsx",startRow = 6, colNames = TRUE,
+                    skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+                    namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()
+
+for (i in 1:8){
+  csp[[paste0("ratio_csp",i)]]=round(csp[[paste0("C17_POP15P_CS",i)]]/csp$C17_POP15P,
+                                     3)
+}
+
+
+
+```
+
+## 75
+
+```{r}
+csp_75=csp[substr(COM,1,2)=="75",c("IRIS","LIBIRIS","P17_POP","C17_POP15P",paste0("C17_POP15P_CS",1:8))]
+csp_75=csp[substr(COM,1,2)=="75",]
+
+## CSP
+
+csp_75=csp_75%>%
+  mutate(ratio_P17_POP2539=P17_POP2539/P17_POP)
+
+for (i in 1:8){
+  csp_75[[paste0("ratio_csp",i)]]=csp_75[[paste0("C17_POP15P_CS",i)]]/csp_75$C17_POP15P
+}
+
+iris_csp_75=iris_75_data%>%
+  mutate(C_IR=as.character(C_IR))%>%
+  merge(csp_75,by.x="C_IR",by.y="IRIS")%>%
+  mutate(densite_C17_POP15P=C17_POP15P/M2_POP)
+
+
+
+```
+
+
+```{r}
+## population
+
+pop_age_75=csp[substr(COM,1,2)=="75",
+               c("IRIS","LIBIRIS","P17_POP","P17_POP0014","P17_POP1529",
+                 "P17_POP3044","P17_POP4559","P17_POP6074","P17_POP75P")]
+
+names(csp)
+
+iris_75_csp=sp::merge(iris_75,csp_75,by.x="C_IR",by.y="IRIS")
+names(iris_75_csp@data)
+```
+
+## IDF
+
+
+```{r}
+csp_idf=csp[substr(COM,1,2) %in% c("75","77","78","91","92","93","94","95"),
+           c("IRIS","LIBIRIS","P17_POP",
+             paste0("C17_POP15P_CS",1:8))]
+
+csp_idf=csp_idf%>%
+  mutate(ratio_csp3=C17_POP15P_CS3/
+           (C17_POP15P_CS1+C17_POP15P_CS2+C17_POP15P_CS3+C17_POP15P_CS4+
+              C17_POP15P_CS5+C17_POP15P_CS6+
+              C17_POP15P_CS7+C17_POP15P_CS8))
+
+
+
+
+iris_idf_csp=sp::merge(iris_idf,csp_idf,by.x="CODE_IRIS",by.y="IRIS")
+
+```
+
+
+
+
+# BAN
+
+https://adresse.data.gouv.fr/data/ban/adresses/latest/csv/
+
+
+```{r}
+ban_75=fread("../data/ban/adresses-75.csv")
+
+
+ggplot(ban_75,aes(lon,lat))+geom_point()+coord_map()+theme_void()
+
+ban_75_ech=ban_75[sample(nrow(ban_75),nrow(ban_75)*0.2),]
+
+ggplot(ban_75_ech,aes(lon,lat))+
+  geom_point()+
+  coord_map()+
+  theme_void()
+
+
+
+```
+
+
+Pour chaque adresse, on peut calculer une valeur
+
+- si initialement, c'est une valeur par zone géographique, on peut d'abord affecter la valeur à un point, puis faire un lissage (KNN)
+- si on doit calculer par rapport à d'autres points, on peut définir un cercle, ou trouver le point le plus proche, etc.
+
+## Affectations iris
+
+```{r}
+iris_75_df=st_as_sf(iris_75)
+
+ban_75_ech_df=sf::st_as_sf(ban_75_ech[,c("lon","lat")],
+                            coords=c("lon","lat"),
+                            crs=st_crs(iris_75_df))
+
+# on on prend tous les points
+# ban_75_ech_df=sf::st_as_sf(ban_75[,c("lon","lat")],
+#                             coords=c("lon","lat"),
+#                             crs=st_crs(iris_75_df))
+
+ban_75_ech_df_iris <- ban_75_ech_df %>% dplyr::mutate(
+  intersection = as.integer(st_intersects(geometry, iris_75_df)),
+  code_iris = if_else(is.na(intersection), "", as.character(iris_75_df$C_IR[intersection]))
+)
+
+```
+
+
+```{r}
+# 
+# 
+# ban_75_ech_df_iris_csp=merge(ban_75_ech_df_iris,
+#                              csp_75[C17_POP15P>200],
+#                              by.x="code_iris",
+#                              by.y="IRIS")
+
+ban_75_ech_df_iris_csp=merge(ban_75_ech_df_iris,
+                             iris_csp_75,
+                             by.x="code_iris",
+                             by.y="C_IR")
+
+ban_75_ech_df_iris_csp=ban_75_ech_df_iris_csp[!ban_75_ech_df_iris_csp$code_iris %in% c("751124577","751124677","751166277","751166377","751166177"),]
+
+
+
+```
+
+## Carte
+
+```{r}
+ggplot(ban_75_ech_df_iris_csp,
+       aes(color=ratio_csp3))+
+  geom_sf()
+```
+densité
+
+```{r}
+ggplot(ban_75_ech_df_iris_csp,
+       aes(color=densite_C17_POP15P))+
+  geom_sf()
+```
+
+
+```{r}
+
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=touri,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addCircles(data=ban_75_ech_df_iris_csp,radius = 1,
+             color = ~pal_num(ratio_csp3))%>%
+  leaflet::addLegend(data=ban_75_ech_df_iris_csp,position="bottomright",
+                     pal=pal_num,values=~ratio_csp3)
+
+
+```
+
+## KNN
+
+```{r}
+coords <- st_coordinates((ban_75_ech_df_iris_csp))
+IDs<-row.names(ban_75_ech_df_iris_csp)
+
+
+# Creating a list of neighbors for each location, using the 5 nearest neighbors 
+knn50 <- knn2nb(knearneigh(coords, k = 300), row.names = IDs)
+knn50 <- include.self(knn50)
+
+
+# Creating the localG statistic for each of counties, with a k-nearest neighbor value of 5, and round this to 3 decimal places
+localGvalues <- localG(x = as.numeric(ban_75_ech_df_iris_csp$ratio_csp3), 
+                       listw = nb2listw(knn50, style = "B"), 
+                       zero.policy = F)
+localGvalues <- round(localGvalues,3)
+
+
+ban_75_ech
+length(localGvalues)
+
+```
+
+```{r}
+
+ban_75_ech_df_iris_csp_w=dplyr:::bind_cols(ban_75_ech_df_iris_csp,
+                                           ratio_csp3_w=as.numeric(localGvalues))
+
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=touri,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addCircles(data=ban_75_ech_df_iris_csp_w,radius = 1,
+             color = ~pal_num(ratio_csp3_w))%>%
+  leaflet::addLegend(data=ban_75_ech_df_iris_csp_w,position="bottomright",
+                     pal=pal_num,values=~ratio_csp3_w)
+
+```
+
+tuto: comprendre: revenir vers la valeur initiale
+
+https://rspatial.org/raster/rosu/Chapter8.html
+
+http://ceadserv1.nku.edu/longa//geomed/ppa/doc/geng/geng.htm
+
+https://r-spatial.github.io/spdep/reference/localG.html
+
+```{r}
+# NOT RUN {
+data(getisord, package="spData")
+# spData 0.3.2 changes x, y, xyz object names to go_x, go_y, go_xyz to
+# avoid putting these objects into the global environment via lazy loading
+if (exists("go_xyz") && packageVersion("spData") >= "0.3.2") {
+  xyz <- go_xyz
+  x <- go_x
+  y <- go_y
+}
+
+xycoords <- cbind(xyz$x, xyz$y)
+nb30 <- dnearneigh(xycoords, 0, 30)
+G30 <- localG(xyz$val, nb2listw(nb30, style="B"))
+G30[length(xyz$val)-136]
+```
+
+
+```{r}
+
+nb60 <- dnearneigh(xycoords, 0, 60)
+G60 <- localG(xyz$val, nb2listw(nb60, style="B"))
+G60[length(xyz$val)-136]
+```
+
+
+```{r}
+nb90 <- dnearneigh(xycoords, 0, 90)
+G90 <- localG(xyz$val, nb2listw(nb90, style="B"))
+G90[length(xyz$val)-136]
+```
+
+
+```{r}
+nb120 <- dnearneigh(xycoords, 0, 120)
+G120 <- localG(xyz$val, nb2listw(nb120, style="B"))
+G120[length(xyz$val)-136]
+nb150 <- dnearneigh(xycoords, 0, 150)
+G150 <- localG(xyz$val, nb2listw(nb150, style="B"))
+G150[length(xyz$val)-136]
+```
+
+
+```{r}
+brks <- seq(30,120,1)
+cm.col <- cm.colors(length(brks)-1)
+image(x, y, t(matrix(xyz$val, nrow=16, ncol=16, byrow=TRUE)),
+  breaks=brks, col=cm.col, asp=1)
+text(xyz$x, xyz$y, round(xyz$val, digits=1), cex=0.7)
+polygon(c(195,225,225,195), c(195,195,225,225), lwd=2)
+title(main=expression(paste("Values of the ", G[i], " statistic")))
+
+```
+```{r}
+range(xyz$val)
+```
+
+
+```{r}
+brks <- seq(-5,5,1)
+
+cm.col <- cm.colors(length(brks)-1)
+image(x, y, t(matrix(G30, nrow=16, ncol=16, byrow=TRUE)),
+  breaks=brks, col=cm.col, asp=1)
+text(xyz$x, xyz$y, round(G30, digits=1), cex=0.7)
+polygon(c(195,225,225,195), c(195,195,225,225), lwd=2)
+title(main=expression(paste("Values of the ", G[i], " statistic")))
+
+```
+
+
+```{r}
+
+G30s <- localG(xyz$val, nb2listw(include.self(nb30),
+ style="B"))
+cat("value according to Getis and Ord's eq. 14.2, p. 263 (1996)\n")
+G30s[length(xyz$val)-136]
+cat(paste("value given by Getis and Ord (1996), p. 267",
+  "(division by n-1 rather than n \n in variance)\n"))
+G30s[length(xyz$val)-136] *
+  (sqrt(sum(scale(xyz$val, scale=FALSE)^2)/length(xyz$val)) /
+  sqrt(var(xyz$val)))
+image(x, y, t(matrix(G30s, nrow=16, ncol=16, byrow=TRUE)),
+  breaks=brks, col=cm.col, asp=1)
+text(xyz$x, xyz$y, round(G30s, digits=1), cex=0.7)
+polygon(c(195,225,225,195), c(195,195,225,225), lwd=2)
+title(main=expression(paste("Values of the ", G[i]^"*", " statistic")))
+# }
+```
+
+
+
+## DNN
+
+à faire
+
+
+```{r}
+
+# Creating a list of neighbors for each location, using the 5 nearest neighbors 
+knn50 <- knn2nb(knearneigh(coords, k = 300), row.names = IDs)
+knn50 <- include.self(knn50)
+
+
+# Creating the localG statistic for each of counties, with a k-nearest neighbor value of 5, and round this to 3 decimal places
+localGvalues <- localG(x = as.numeric(ban_75_ech_df_iris_csp$ratio_csp3), 
+                       listw = nb2listw(knn50, style = "B"), 
+                       zero.policy = F)
+localGvalues <- round(localGvalues,3)
+
+
+ban_75_ech
+length(localGvalues)
+
+```
+
+```{r}
+
+ban_75_ech_df_iris_csp_w=dplyr:::bind_cols(ban_75_ech_df_iris_csp,
+                                           ratio_csp3_w=as.numeric(localGvalues))
+
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=touri,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addCircles(data=ban_75_ech_df_iris_csp_w,radius = 1,
+             color = ~pal_num(ratio_csp3_w))%>%
+  leaflet::addLegend(data=ban_75_ech_df_iris_csp_w,position="bottomright",
+                     pal=pal_num,values=~ratio_csp3_w)
+
+```
+
+## nngeo
+
+https://michaeldorman.github.io/nngeo/articles/intro.html
+
+
+```{r}
+
+st_join(ban_75_ech_df_iris_csp, 
+        ban_75_ech_df_iris_csp, join = st_nn, k = 200, maxdist = 50, progress = FALSE)
+
+
+```
+
+
+# prix immo
+
+```{r}
+iris_immo=read.csv2("../data/insee/prix_m2_IRIS.csv",dec=".")%>%data.table()
+```
+
+```{r}
+
+hist(iris_immo$PrixM2_2014)
+
+```
+
+
+# Autres insee
+
+https://www.insee.fr/fr/statistiques?taille=100&debut=0&idprec=3288151&geo=ICQ-1
+
+
+Logements, individus, activité, mobilités scolaires et professionnelles, migrations résidentielles en 2015
+
+
+https://www.insee.fr/fr/statistiques/3558417
+
+# Contours et open data
+
+
+## shapefiles
+
+```{r,eval=FALSE}
+
+## zones touristiques
+
+touri=readOGR("../data/zones-touristiques-internationales/zones-touristiques-internationales.shp",
+            layer="zones-touristiques-internationales")
+
+names(touri)
+Encoding(touri[["name"]]) <- "UTF-8"
+# Codes postaux
+
+cp=readOGR("../data/shapefiles/codes_postaux/codes_postaux_region.shp",
+            layer="codes_postaux_region")
+names(cp)
+cp=spTransform(cp, CRS("+proj=longlat +datum=WGS84"))
+
+cp_75=subset(cp,DEP=="75")
+
+# codes iris: toute france, pour paris, c'est mieux de prendre apur
+
+iris=readOGR("../data/IRIS/CONTOURS-IRIS.shp",
+            layer="CONTOURS-IRIS")
+names(iris)
+
+Encoding(iris[["NOM_IRIS"]]) <- "UTF-8"
+
+iris=spTransform(iris, CRS("+proj=longlat +datum=WGS84"))
+
+iris_75=subset(iris,substr(INSEE_COM,1,2) == "75")
+
+
+# transports en commun
+
+tr=readOGR("../data/transports/emplacement-des-gares-idf/emplacement-des-gares-idf.shp",
+            layer="emplacement-des-gares-idf")
+
+names(tr)
+
+tr_75=subset(tr,gares_id %in% unique(over(iris_75,tr)$gares_id))
+
+tr_data=data.table(tr@data)
+
+
+Encoding(tr_data$nom) <- "UTF-8"
+Encoding(tr_data$mode) <- "UTF-8"
+tr_data[,.N,by=mode]
+
+tr_data[mode=="Métro",]
+tr_data[mode=="Metro",]
+
+```
+
+
+
+
+```{r}
+iris_apur=readOGR("../data/shapefiles/IRIS/apur/IRIS.shp",
+            layer="IRIS")
+names(iris_apur)
+data.table(iris_apur@data)[,.N,by=C_CAINSEE]
+
+Encoding(iris_apur[["L_IR"]]) <- "UTF-8"
+
+iris_apur=spTransform(iris_apur, CRS("+proj=longlat +datum=WGS84"))
+
+iris_apur_75=subset(iris_apur,substr(C_CAINSEE,1,2) == "75")
+iris_apur_75_data=data.table(iris_75@data)
+plot(iris_apur_75)
+
+```
+
+
+
+
+## affectations codes iris
+
+on fait uniquement pour Paris
+
+On a deux sources: 
+- ING
+- Apur
+
+Si Apur est vide, on peut prendre ING, si différent, on peut préférer apur
+
+il faut mieux garder les deux: iris et iris_apur à distinguer (c'est pas toujours fait, attention à refaire bien)
+
+```{r}
+
+#siret_paris=siret_paris[etatAdministratifEtablissement=="A" & substr(codeCommuneEtablissement,1,2)=="75"]
+
+siret_paris=siret_paris[etatAdministratifEtablissement=="A" ]
+
+siret_paris <-  siret_paris[!is.na(longitude)]
+siret_paris <- siret_paris[!is.na(latitude)]
+
+siret_paris <- siret_paris[(longitude> -6 & longitude < 12 & latitude > 41 & latitude < 52) ]
+
+Encoding(siret_paris$geo_adresse)<- "UTF-8"
+
+
+# transformation contours iris avec package sf pour calculer les intersections
+
+iris_75_df=st_as_sf(iris_75)
+
+siret_paris_df=sf::st_as_sf(siret_paris_iris_voies[,c("latitude","longitude")],
+                            coords=c("longitude","latitude"),
+                            crs=st_crs(iris_75_df))
+
+siret_paris_df_iris <- siret_paris_df %>% dplyr::mutate(
+  intersection = as.integer(st_intersects(geometry, iris_75_df)),
+  code_iris = if_else(is.na(intersection), "", as.character(iris_75_df$C_IR[intersection]))
+)
+
+as.integer(st_intersects(siret_paris_df_iris$geometry, iris_75_df))
+           
+```
+
+fusion avec la base existante
+
+```{r}
+siret_paris_iris_voies=cbind(siret_paris_iris_voies,
+                       data.table(siret_paris_df_iris)[,c("code_iris_apur")])
+
+siret_paris_iris_voies[code_iris_apur!=area,c("geo_adresse","longitude","latitude",
+                                              "code_iris_apur","area")]
+siret_paris_iris_voies[code_iris_apur=="",c("geo_adresse","longitude","latitude",
+                                            "code_iris_apur","area")]
+       
+```
+
+```{r}
+hist(siret_paris_iris$latitude)
+hist(siret_paris_iris$longitude)
+
+siret_paris_iris[,.N,by=cj2]
+
+
+siret_paris_iris_cj2_92=siret_paris_iris[cj2==92]
+```
+
+pour prendren en compte les DOM TOM
+
+```{r,eval=FALSE}
+dat <- dat[(longitude> -6 & longitude < 12 & latitude > 41 & latitude < 52) | 
+            (longitude> -68 & longitude < -48 & latitude > 0 & latitude < 20)|
+             (longitude> 50 & longitude < 60 & latitude > -21 & latitude < -18)]
+
+
+```
+
+
+
+## Tronçons de voies
+
+https://opendata.apur.org/datasets/Apur::troncon-voie
+https://opendata.paris.fr/explore/dataset/troncon_voie/information/
+https://www.data.gouv.fr/fr/datasets/denominations-des-emprises-des-voies-actuelles/
+https://parisdata.opendatasoft.com/explore/dataset/denominations-emprises-voies-actuelles/information/
+
+```{r}
+voies=readOGR("../data/shapefiles/TRONCON_VOIE/TRONCON_VOIE.shp")
+
+names(voies)
+voies_ech=subset(voies,objectid%in% c("13","77264"))
+voies_ech =  spTransform(voies_ech,"+proj=longlat +datum=WGS84")
+# pour Paris
+voies_75=subset(voies,c_coinsee=="75056")
+voies_75 =  spTransform(voies_75,"+proj=longlat +datum=WGS84")
+head(voies_75)
+```
+
+
+```{r}
+sort(table(voies_75[["c_coinsee"]]))
+sum(table(voies_75[["c_coinsee"]]))
+```
+
+```{r}
+names(voies_75)
+
+voies_75_data=data.table(voies_75@data)
+voies_75_data[,.N,by=c("c_coinsee","n_sq_vo","n_sq_co","n_sq_tv")]
+voies_75_data[,.N,by=c("c_coinsee","n_sq_vo","n_sq_co")]
+voies_75_data[,.N,by=c("c_coinsee","n_sq_co")]
+```
+
+### Affectations voies aux adresses
+
+calculer le tronçon de voie le plus proche
+
+https://stackoverflow.com/questions/47675571/r-spatial-join-between-spatialpoints-gps-coordinates-and-spatiallinesdatafra
+https://gis.stackexchange.com/questions/269746/find-nearest-line-segment-to-each-point-in-r
+https://stackoverflow.com/questions/55752064/finding-closest-coordinates-between-two-large-data-sets
+
+```{r}
+
+Encoding(siret_paris_iris$geo_adresse)<- "UTF-8"
+
+siret_paris_iris_sp_ech <- spTransform(SpatialPoints(siret_paris_iris[1:10,c("longitude","latitude")],
+                                                     proj4string=CRS("+proj=longlat +datum=WGS84")),
+                     "+proj=longlat +datum=WGS84")
+
+
+```
+
+```{r}
+seq_ech=60001:nrow(lonlatvoies_temp)
+
+siret_paris_iris_sp <- spTransform(SpatialPoints(lonlatvoies_temp[seq_ech,
+                                                                         c("longitude","latitude")],
+                                                 proj4string=CRS("+proj=longlat +datum=WGS84")),
+                     "+proj=longlat +datum=WGS84")
+
+gd <- gDistance(voies_75,siret_paris_iris_sp,byid=TRUE)
+a <- apply(gd, 1, which.min)
+lonlatvoies_temp[seq_ech]$id_voies=a
+
+```
+
+```{r}
+lonlatvoies_temp[is.na(id_voies),]
+
+lonlatvoies_temp$objectid=voies_75$objectid[lonlatvoies_temp$id_voies]
+
+```
+
+```{r}
+# on va trouver les tronçons de voies par latlon uniques
+# la variable lonlatvoies est donc importante
+lonlatvoies=unique(siret_paris_iris[,c("longitude","latitude")])%>%
+  merge(unique(siret_paris_iris_cj2_92[,c("longitude","latitude","id_voies","objectid")]),
+        by=c("longitude","latitude"),all.x=T)
+
+# identifier les lonlat qui n'ont pas encore de voies
+lonlatvoies_temp=lonlatvoies[is.na(id_voies),]
+
+
+# fusion avec le fichier temporaire
+
+
+lonlatvoies=rbind(lonlatvoies[is.na(id_voies)==F,],lonlatvoies_temp)
+
+
+saveRDS(lonlatvoies,file="../data/lonlatvoies.rds")
+
+# fusion pour avoir la base finale
+# on a successivement: siret, siret_paris, siret_paris_iris pour avoir les codes iris
+# enfin: siret_paris_iris_voies pour avoir les voies 
+
+siret_paris_iris_voies=merge(siret_paris_iris,lonlatvoies,
+                             by=c("longitude","latitude"),all.x=T)
+
+saveRDS(siret_paris_iris_voies,file="../data/siret_paris_iris_voies.rds")
+
+
+```
+
+
+fusion avec voies
+
+```{r}
+
+# stat par catégorie, pour compter le voies par tronçons de voies
+
+siret_paris_iris_cj2_92_stat_voies=siret_paris_iris_cj2_92[,.N,by=objectid]
+
+voies_75_asso=sp::merge(voies_75,
+                        siret_paris_iris_cj2_92_stat_voies[N>20],
+                        by.x="objectid",by.y="objectid")
+
+```
+
+carto test
+
+```{r}
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=voies_ech,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")%>%
+  addCircles(data=siret_paris_iris[1:10],radius = 1)
+
+```
+
+```{r}
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=subset(voies_75,objectid %in% siret_paris_iris_cj2_92[1:10]$id_voies),opacity = 1,
+               fillOpacity = 0.5,weight = 20,fillColor = "grey",color="black")%>%
+  addCircles(data=siret_paris_iris_cj2_92[1:10],radius = 1)
+
+```
+
+```{r}
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=voies_75_asso,opacity = 1,fillOpacity = 0.5,
+               weight = 2,fillColor = "grey",color="black")
+
+```
+
+## comptage linéaire commercial
+
+
+```{r}
+
+bdcom=readOGR("../data/shapefiles/BDCOM_2020/BDCOM_2020.shp")
+lincom=readOGR("../data/shapefiles/LINEAIRE_COMMERCIAL/LINEAIRE_COMMERCIAL.shp")
+
+bdcom=spTransform(bdcom, CRS("+proj=longlat +datum=WGS84"))
+lincom=spTransform(lincom, CRS("+proj=longlat +datum=WGS84"))
+
+```
+
+en cours
+
+
+
+```{r}
+
+
+lincom_sf=st_as_sf(lincom,crs=st_crs(iris_75_df))
+
+nrow(lincom_sf)
+
+lincom_sf[20:900,]
+
+lincom_dt=lincom_sf %>% dplyr::mutate(
+  intersection = as.integer(sapply(st_intersects(geometry,iris_75_df), "[", 1)),
+  code_iris = if_else(is.na(intersection), "", as.character(iris_75_df$C_IR[intersection]))
+)%>%data.table()
+
+
+lenlncomiris=lincom_dt[,.(nlincom=.N,
+                          sumlenlincom=sum(Shape_Leng)),
+          by="code_iris"]
+
+nrow(lincom_sf)
+
+```
+
+pour explorer les polylines qui sont sur plusieurs codes iris
+
+```{r}
+
+
+inter_test=st_intersects(lincom_sf$geometry,iris_75_df)
+inter_test[]
+
+
+table(lengths(inter_test))
+
+sapply(inter_test, "[", 1)[6790]
+
+data.table(id=1:nrow(lincom_sf),
+           lengiris=lengths(inter_test))[lengiris==2]
+
+```
+
+## tests shpfile
+
+
+```{r}
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=touri,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addCircles(data=tr,radius = 1)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=touri,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addCircles(data=tr,radius = 1)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=touri,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")
+
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=rdita,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")
+
+```
+
+
+
+# Autres données
+
+## Autres données Paris
+
+https://www.data.gouv.fr/fr/organizations/mairie-de-paris/
+
+https://opendata.paris.fr/
+

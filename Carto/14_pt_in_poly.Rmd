@@ -1,0 +1,132 @@
+
+
+# affectations codes iris
+
+on fait uniquement pour Paris
+
+On a deux sources: 
+
+- ING
+- Apur
+
+Si Apur est vide, on peut prendre ING, si différent, on peut préférer apur
+
+il faut mieux garder les deux: iris et iris_apur à distinguer (c'est pas toujours fait, attention à refaire bien)
+
+
+## Données adresses
+
+On peut utiliser une base avec quelques adresses à Paris
+
+- Base Adresse Nationale de Paris
+- Des établissements géocodés
+
+La performance peut être un point important si on a beaucoup de données.
+
+```{r}
+siret_paris=readRDS("../data/siret_paris.rds")
+```
+
+
+```{r}
+#siret_paris=siret_paris[etatAdministratifEtablissement=="A" & substr(codeCommuneEtablissement,1,2)=="75"]
+
+siret_paris=siret_paris[etatAdministratifEtablissement=="A" ]
+
+siret_paris <-  siret_paris[!is.na(longitude)]
+siret_paris <- siret_paris[!is.na(latitude)]
+
+siret_paris <- siret_paris[(longitude> -6 & longitude < 12 & latitude > 41 & latitude < 52) ]
+
+Encoding(siret_paris$geo_adresse)<- "UTF-8"
+
+```
+
+## Contours IRIS
+
+
+On peut utiliser deux bases différentes:
+
+- IGN
+- Apur
+
+
+```{r}
+
+iris_75_df=st_as_sf(iris_75)
+
+
+```
+
+siret_paris_iris_voies
+contient le code IRIS déjà avec la variable area
+
+```{r}
+siret_paris_sf=sf::st_as_sf(siret_paris[,c("latitude","longitude")],
+                            coords=c("longitude","latitude"),
+                            crs=st_crs(iris_75_df))
+```
+
+
+```{r}
+# siret_paris_sf=sf::st_as_sf(siret_paris_iris_voies[,c("latitude","longitude")],
+#                             coords=c("longitude","latitude"),
+#                             crs=st_crs(iris_75_df))
+
+siret_paris_df_iris <- siret_paris_sf %>% dplyr::mutate(
+  intersection = as.integer(st_intersects(geometry, iris_75_df)),
+  code_iris = if_else(is.na(intersection), "", as.character(iris_75_df$CODE_IRIS[intersection]))
+)
+
+
+```
+
+
+
+fusion avec la base existante
+
+```{r}
+siret_paris_iris=cbind(siret_paris,
+                       data.table(siret_paris_df_iris)[,c("code_iris")])
+```
+
+# Comparaison 
+
+Comparaison entre les résultats de deux bases: APUR et IRIS ING.
+
+Code à mettre à jour
+
+```{r}
+siret_paris_iris=cbind(siret_paris_df,
+                       data.table(siret_paris_df_iris)[,c("code_iris_apur")])
+
+siret_paris_iris[code_iris_apur!=area,c("geo_adresse","longitude","latitude",
+                                              "code_iris_apur","area")]
+siret_paris_iris[code_iris_apur=="",c("geo_adresse","longitude","latitude",
+                                            "code_iris_apur","area")]
+       
+```
+
+```{r}
+hist(siret_paris_iris$latitude)
+hist(siret_paris_iris$longitude)
+
+siret_paris_iris[,.N,by=cj2]
+
+
+siret_paris_iris_cj2_92=siret_paris_iris[cj2==92]
+```
+
+pour prendren en compte les DOM TOM
+
+```{r,eval=FALSE}
+
+dat <- dat[(longitude> -6 & longitude < 12 & latitude > 41 & latitude < 52) | 
+            (longitude> -68 & longitude < -48 & latitude > 0 & latitude < 20)|
+             (longitude> 50 & longitude < 60 & latitude > -21 & latitude < -18)]
+
+
+```
+
+
+

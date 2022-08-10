@@ -1,0 +1,246 @@
+---
+title: "IDF - Logements"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+<style>
+.dataTables_scrollBody {
+    max-height: 100% !important;
+}
+</style>
+
+
+```{r,eval=FALSE}
+render("90_fdb_idf_logmt.Rmd","flexdashboard::flex_dashboard",
+       encoding="UTF-8",
+       output_dir = "fdb_fichier",
+       quiet = T,
+       output_options=list(self_contained=F))
+       
+```
+
+
+# Données
+
+## Row {.tabset .tabset-fade}
+
+### 92
+
+```{r,eval=F}
+iris_logmt_idf=sp::merge(iris_apur,logmt,by.x="C_IR",by.y="IRIS",all.x=T)
+
+
+names(iris_logmt_idf)
+
+
+iris_logmt_idf@data=iris_logmt_idf@data%>%
+  mutate(ratio_RP=ifelse(P16_LOG>100,P16_RP/P16_LOG,NA),
+         ratio_MAISON=ifelse(P16_LOG>100,P16_MAISON/P16_LOG,NA),
+         ratio_APPART= ifelse(P16_LOG>100,P16_APPART/P16_LOG,NA),
+         ratio_LOGVAC= ifelse(P16_LOG>100,P16_LOGVAC/P16_LOG,NA),
+         ratio_RP_PROP= ifelse(P16_LOG>100,P16_RP_PROP/P16_LOG,NA),
+         ratio_RP_LOC= ifelse(P16_LOG>100,P16_RP_LOC/P16_LOG,NA),
+         ratio_RP_LOCHLMV= ifelse(P16_LOG>100,P16_RP_LOCHLMV/P16_LOG,NA),
+         ratio_RP_GRAT= ifelse(P16_LOG>100,P16_RP_GRAT/P16_LOG,NA),
+         ratio_RP_120M2P= ifelse(P16_LOG>100,P16_RP_120M2P/P16_LOG,NA),
+         ratio_RP_RP_M30M2= ifelse(P16_LOG>100,P16_RP_M30M2/P16_LOG,NA),
+         ratio_P16_PMEN_ANEM10P= ifelse(P16_PMEN>100,P16_PMEN_ANEM10P/P16_PMEN,NA),
+         ratio_P16_PMEN_ANEM5P= ifelse(P16_PMEN>100,(P16_MEN_ANEM0509+P16_PMEN_ANEM10P)/P16_PMEN,NA))
+
+
+
+P16_PMEN_ANEM0002
+P16_PMEN_ANEM0204
+P16_PMEN_ANEM0509
+
+
+```
+
+
+```{r,eval=F}
+iris_logmt_idf_data=data.table(iris_logmt_idf@data)
+
+```
+
+
+```{r}
+
+iris_logmt_idf_data[substr(as.character(C_IR),1,2)=="92"]%>%
+  select(-OBJECTID)%>%
+  datatable()
+
+
+```
+
+
+### 75
+
+```{r}
+
+iris_logmt_idf_data[substr(as.character(C_IR),1,2)=="75"]%>%
+  select(-OBJECTID)%>%
+  datatable()
+
+
+```
+
+
+
+
+# Maisons
+
+## Row {.tabset .tabset-fade}
+
+### Prop maisons
+
+
+```{r}
+data=iris_logmt_idf
+var="ratio_MAISON"
+
+carte_log=function(data=iris_logmt_idf,
+                   var="ratio_MAISON",label="Prop maison") {
+  leaflet() %>% 
+    addTiles(group = "OSM (default)")%>% 
+    addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+    addPolygons(data=iris_apur_insee,opacity = 1,fillOpacity = 0,
+                weight = 0.8,color="blue",
+                group="Communes")%>%
+    addPolygons(data=data,opacity = 1,fillOpacity = 0.5,weight = 0.8,
+                group="IRIS",
+                color = ~pal_num(get(var)),
+                popup = ~paste0(LIBIRIS,
+                                "<br>Total logments : ",round(P16_LOG,0),
+                                "<br>Rés princip. : ",round(P16_RP,0),
+                                "<br>Rés second. : ",round(P16_RSECOCC,0),
+                                "<br>Total maisons : ",round(P16_MAISON,0),
+                                "<br>Total appart. : ",round(P16_APPART,0),
+                                "<br>Total vac. : ",round(P16_LOGVAC,0),
+                                "<br>Prop maison : ",round(ratio_MAISON,2),
+                                "<br>Prop appart : ",round(ratio_APPART,2),
+                                "<br>8 Autres : ",round(ratio_MAISON,2)))%>%
+    addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+    addPolygons(data=iris_apur_dep,opacity = 1,fillOpacity = 0,
+                weight = 1,color="black",
+                group="Départements")%>%
+    # Layers control
+    addLayersControl(
+      baseGroups = c("OSM (default)", "Positron"),
+      overlayGroups = c("Départements","Communes", "IRIS"),
+      options = layersControlOptions(collapsed = FALSE)
+    )%>%
+    leaflet::addLegend(data=data,
+                       position="bottomright",
+                       pal=pal_num,
+                       values=~get(var),
+                       title ="Valeur")
+}
+
+
+carte_log()
+
+names(iris_csp_idf)
+```
+
+
+# Occupation
+
+## Row {.tabset .tabset-fade}
+
+### Prop RP prop
+
+```{r}
+
+carte_log(data=iris_logmt_idf,var="ratio_RP_PROP",label="Prop RP occup proprio")
+
+```
+
+
+### Prop RP loc
+
+```{r}
+
+carte_log(data=iris_logmt_idf,var="ratio_RP_LOC",label="Prop RP occup loc")
+
+```
+
+
+### Prop RP HLM vide
+
+```{r}
+
+carte_log(data=iris_logmt_idf,var="ratio_RP_LOCHLMV",label="Prop RP occup loc")
+
+```
+
+
+
+# RP
+
+## Row {.tabset .tabset-fade}
+
+### Prop RP
+
+```{r}
+
+carte_log(data=iris_logmt_idf,var="ratio_RP",label="Prop RP")
+
+```
+
+
+### Log vac
+
+
+```{r}
+
+carte_log(data=iris_logmt_idf,var="ratio_LOGVAC",label="Prop RP")
+
+```
+
+
+### + 120 m2
+
+
+```{r}
+
+carte_log(data=iris_logmt_idf,var="ratio_RP_120M2P",label="Prop RP")
+
+```
+
+
+### - 30 m2
+
+
+```{r}
+
+carte_log(data=iris_logmt_idf,var="ratio_RP_RP_M30M2",label="Prop RP")
+
+```
+
+
+
+# Ménage
+
+## Row {.tabset .tabset-fade}
+
+### Ancienneté + 10 ans
+
+```{r}
+
+carte_log(data=iris_logmt_idf,var="ratio_P16_PMEN_ANEM10P",label="Prop RP")
+
+```
+
+### Ancienneté + 5 ans
+
+```{r}
+
+carte_log(data=iris_logmt_idf,var="ratio_P16_PMEN_ANEM5P",label="Prop RP")
+
+```

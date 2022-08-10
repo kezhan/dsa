@@ -1,0 +1,288 @@
+
+# Unions de polygones
+
+```{r}
+
+map <- ggplot(idf, aes(long,lat,group=group)) +
+  geom_polygon(fill="white",alpha=0)+
+  coord_map(project="globular") +
+  geom_path(data = idf, colour = "red", fill="white",size = .75)+
+  geom_path(data = idf.com, colour = "black", fill="white",size = .2, alpha =0.5)+
+  theme_void()+labs(title="Grand Paris")
+map
+
+```
+
+
+```{r}
+cp_idf=cp[cp$DEP %in% c("75","92","93","94"),]
+plot(cp_idf)
+
+DEP_idf_df=cp_idf$DEP
+dep_idf <- unionSpatialPolygons(cp_idf, DEP_idf_df)
+plot(dep_idf)
+
+```
+
+
+```{r}
+names(dep)
+```
+
+# Carte IRIS apur
+
+
+```{r}
+iris_apur
+
+
+iris_apur_insee <- unionSpatialPolygons(iris_apur, iris_apur@data$C_CAINSEE)
+
+plot(iris_apur_insee)
+
+```
+
+
+# Carto régions
+
+
+```{r,eval=FALSE}
+names(dep)
+dep.t=spTransform(dep, CRS("+proj=longlat +datum=WGS84"))
+
+dep.t_i=dep.t
+
+names(dep.t)
+
+dep.t$CODE_DEPT
+
+length(dep.t$CODE_DEPT)
+
+plot(dep.t)
+
+
+caisses_order_id=regcaisses[dep %in% dep.t$CODE_DEPT ][order(match(dep, dep.t$CODE_DEPT))]$abrevcaisse
+
+length(caisses_order_id)
+
+# jointure pour avoir les contours des régions
+
+dep.t_i <- unionSpatialPolygons(dep.t, caisses_order_id)
+names(dep.t_i)
+
+# contours des départements spécifiques
+
+
+liste_i_dep=c("75","92","93","94","91","95","78","77")
+
+
+names(dep_idf)
+
+dep_paris=dep.t[dep.t$CODE_DEPT %in% "75",]
+
+dep.t_idf=dep.t[dep.t$CODE_DEPT %in% liste_i_dep,]
+
+
+```
+
+# Union communes
+
+
+```{r}
+names(cp)
+```
+
+
+```{r}
+
+
+cp_bp=read.xlsx("../data_bpce/Corresp_CPostaux_BP v1.xlsx",startRow = 1, colNames = TRUE,
+                    skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+                    namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()
+
+
+cpp_i=subset(cpp,code_postal %in% cp_bp[lib_bp=="BPRI"]$COPOST)
+
+cp_i=subset(cp,ID %in% cp_bp[lib_bp=="BPRI"]$COPOST)
+
+plot(cp_i)
+
+cp_bp[,.N,by=lib_bp]
+
+
+
+```
+
+
+```{r}
+DEP_i=cp_i$DEP
+dep_i <- unionSpatialPolygons(cp_i, DEP_i)
+plot(dep_i)
+names(dep.t_i)
+```
+
+## Carto
+
+
+```{r}
+dep_i_df <- fortify(spTransform(dep_i, CRS("+proj=longlat +datum=WGS84")))
+cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+```
+
+
+```{r}
+ggplot()+
+  geom_polygon(data=cp_i_df,aes(long,lat,group=group,fill=hole),
+               colour="black",alpha=0)+
+  geom_polygon(data=dep_i_df,aes(long,lat,group=group,fill=hole),
+               colour="red",alpha=0)+
+  coord_map()+theme_void()+labs(title="Départements français")+
+  # scale_fill_manual(values = c("blue", "white"))+ 
+  theme(legend.position = "none")
+
+```
+
+## Fonction pour une banque
+
+
+```{r}
+cp_bp[,.N,by=lib_bp]
+banque_i="BPACA"
+
+carto_banque=function(banque_i){
+  
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  DEP_i=cp_i$DEP
+  dep_i <- unionSpatialPolygons(cp_i, DEP_i)
+  
+  dep_i_df <- fortify(spTransform(dep_i, CRS("+proj=longlat +datum=WGS84")))
+  cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  
+  p=ggplot()+
+    geom_polygon(data=cp_i_df,aes(long,lat,group=group,fill=hole),
+                 colour="black",alpha=0,size=0.3)+
+    geom_polygon(data=dep_i_df,aes(long,lat,group=group,fill=hole),
+                 colour="red",alpha=0)+
+    coord_map()+theme_void()+labs(title=banque_i)+
+    # scale_fill_manual(values = c("blue", "white"))+ 
+    theme(legend.position = "none")
+  return(p)
+}
+
+carto_banque("BPACA")
+
+```
+
+
+```{r}
+p
+```
+
+# Fusion avec données
+
+
+
+
+```{r}
+
+carto_banque_cli=function(tranches_ca_i="> 5 M",
+                      banque_i="BPACA",
+                      SEG_ETUDE_TPE_i="Entreprise"){
+  
+  cli_n=bp_cli[annee=="2020" & tranches_ca==tranches_ca_i & id_bp==banque_i,.N,by="cd_postal_cli"]
+
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+
+  
+  
+  DEP_i=cp_i$DEP
+  dep_i <- unionSpatialPolygons(cp_i, DEP_i)
+  
+  dep_i_df <- fortify(spTransform(dep_i, CRS("+proj=longlat +datum=WGS84")))
+  cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  
+  cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  
+  p=ggplot()+
+    geom_polygon(data=cp_i_df,aes(long,lat,group=group,fill=N),
+                 colour="black",alpha=0.5,size=0.3)+
+    geom_polygon(data=dep_i_df,aes(long,lat,group=group),
+                 colour="red",alpha=0)+
+    coord_map()+theme_void()+labs(title=paste(banque_i," - Segment: ",SEG_ETUDE_TPE_i," - Tranche CA: ",tranches_ca_i))
+    # scale_fill_manual(values = c("blue", "white"))+ 
+    # theme(legend.position = "none")
+
+  return(p)
+}
+
+p
+
+```
+
+```{r}
+
+reg_stat=dep_data[,.N,by=c("CODE_REG","NOM_REG")]
+reg_i="27"
+dep_data[CODE_REG==reg_i]$CODE_DEPT
+
+```
+
+```{r}
+cp
+```
+
+```{r}
+
+carto_reg=function(reg_i="28"){
+  
+  reg_nom=dep_data[CODE_REG==reg_i]$NOM_REG
+  
+  cp_i=subset(cp,DEP %in% dep_data[CODE_REG==reg_i]$CODE_DEPT)
+  
+  cp_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  
+  dep_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84"))) %>%
+    group_by(DEP) %>% 
+    dplyr::summarize(geometry = st_union(geometry),
+                     POP2010=sum(POP2010,na.rm = T))
+  # %>%
+  #   sp::merge(dep_data,.,by.x="CODE_DEPT",by.y="DEP")
+
+  # using sf
+  dep_c_sf <- st_centroid(dep_sf)
+  
+  cp_c_sf <- st_centroid(cp_sf)
+  
+  p=ggplot()+
+    geom_sf(data=cp_sf,aes(fill=POP2010/SURF ),
+            colour="grey",alpha=0.5,size=0.1)+
+    geom_sf(data=dep_sf,alpha=0,colour="black",size=0.2)+
+    geom_sf(data=dep_c_sf,aes(size=POP2010),pch=1,color="red")+
+    geom_sf_text(data=dep_c_sf,aes(label=paste0("(",DEP,")")),size=3)+
+    theme_void()+labs(title=paste("Region: ",reg_nom,"(",reg_i,")"))+
+    scale_fill_continuous(low="#C2FDFF", high="#FF0000", 
+                          guide="colorbar",na.value="white",
+                          name="nombre d'habitants")
+  # scale_fill_manual(values = c("blue", "white"))+ 
+  # theme(legend.position = "none")
+  
+  p
+  
+  return(p)
+}
+
+carto_reg("11")
+
+
+```
+
+
+```{r}
+carto_reg("28")
+```
+
+
+

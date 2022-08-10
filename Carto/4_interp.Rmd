@@ -1,0 +1,229 @@
+---
+title: "Interpolation"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    navbar:
+      - { title: "Accueil", href: "index.html", align: right}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+
+```{r,eval=FALSE}
+csp_cible="C17_POP15P_CS3"
+ratio_csp_cible="ratio_csp3"
+iris_75_csp$csp_cible=iris_75_csp[[csp_cible]]
+iris_75_csp$ratio_csp_cible=iris_75_csp[[ratio_csp_cible]]
+
+
+# 
+# iris_75_csp$csp_cible=iris_75_csp$C17_POP15P_CS3
+# iris_75_csp$ratio_csp_cible=iris_75_csp$ratio_csp3
+
+```
+
+
+# CSP 75
+
+## Row {.tabset}
+
+### Sans lissage
+
+
+```{r}
+pal_num <- colorNumeric(c("blue","yellow","red"), NULL, n = 4)
+# 
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(ratio_csp_cible))
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(ratio_csp_cible),
+              popup=~paste(IRIS,NOM_IRIS,"<br>",format(csp_cible,digits=0),
+                           "<br>",ratio_csp_cible))%>%
+  leaflet::addLegend(data=iris_75_csp,position="bottomright",
+                     pal=pal_num,
+                     values=~ratio_csp_cible)
+
+```
+
+
+### Carte statique
+
+```{r}
+
+# iris_75_csp_point
+
+iris_75_csp_point=st_as_sf(iris_75_csp) %>% 
+  st_point_on_surface()
+
+iris_75_csp_point=subset(iris_75_csp_point,is.na(ratio_csp_cible)==F)
+iris_75_csp_point=subset(iris_75_csp_point,P17_POP>500)
+
+v0 = gstat::variogram(ratio_csp_cible~1, iris_75_csp_point)
+
+plot(v0, plot.numbers = TRUE)
+
+v.m = fit.variogram(v0, vgm(2, "Exp", 100))
+
+plot(v0, v.m, plot.numbers = TRUE)
+
+
+```
+```{r,eval=FALSE}
+v.m = fit.variogram(v0, vgm(10, "Mat", 100))
+
+plot(v0, v.m, plot.numbers = TRUE)
+
+```
+
+
+```{r}
+
+g = st_make_grid(st_as_sf(iris_75_csp),what = "centers",n=c(100,100))
+# g = st_make_grid(st_as_sf(iris_75e),what = "centers",n=c(100,100))
+
+```
+
+```{r,eval=FALSE}
+# idw
+
+i = idw(ratio_csp_cible~1, iris_75_csp_point, g)
+
+ggplot() + geom_stars(data = i, aes(fill = var1.pred, x = x, y = y)) + 
+    geom_sf(data = iris_75_csp_point)
+
+idata=cbind(data.table(st_coordinates(i)),
+      var1.pred=i$var1.pred)
+
+
+ggplot() + geom_raster(data = idata, 
+                       aes(fill = var1.pred, x = X, y = Y)) +
+  scale_fill_distiller(palette = "Spectral")+ 
+    geom_sf(data = st_as_sf(iris_75_csp),alpha=0)
+
+
+plot(i)
+```
+
+```{r}
+
+
+# krige
+
+k = krige(ratio_csp_cible~1, iris_75_csp_point, g, v.m)
+
+# intersection
+
+k2 =st_intersection(x = k, y = st_as_sf(iris_75))
+
+kdata2=cbind(data.table(st_coordinates(k2)),
+      var1.pred=k2$var1.pred)
+
+# sans intersection
+
+kdata=cbind(data.table(st_coordinates(k)),
+      var1.pred=k$var1.pred)
+
+
+ggplot()  +geom_raster(data=kdata,aes(fill=var1.pred,x=X,y=Y))+
+  scale_fill_distiller(palette = "Spectral")+ 
+    geom_sf(data = st_as_sf(iris_75_csp),alpha=0)
+
+
+```
+
+### Carte interactive
+
+```{r}
+hv=acast(kdata, X ~ Y, value.var = "var1.pred")
+
+CL <- contourLines(unique(kdata$X) , unique(kdata$Y) , as.matrix(hv),nlevels =15)
+
+## EXTRACT CONTOUR LINE LEVELS
+LEVS <- as.factor(sapply(CL, `[[`, "level"))
+
+NLEV <- length(levels(LEVS))
+```
+
+```{r}
+colfunc_cs3ratio<-colorRampPalette(c("red","yellow","blue","grey"))
+colfunc_cs3ratio<-colorRampPalette(c("red","yellow","springgreen","royalblue","grey"))
+```
+
+```{r,eval=FALSE}
+plot(rep(1,NLEV),col=rev(colfunc_cs3ratio(NLEV)), pch=19,cex=2)
+
+```
+
+```{r}
+
+## CONVERT CONTOUR LINES TO POLYGONS
+pgons <- lapply(1:length(CL), function(i)
+  Polygons(list(Polygon(cbind(CL[[i]]$x, CL[[i]]$y))), ID=i))
+spgons = SpatialPolygons(pgons)
+
+## Leaflet map with polygons
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron,group="carte") %>%
+  addPolygons(data=spgons,
+              color = rev(colfunc_cs3ratio(NLEV)[LEVS]),
+              group="Contours ratio CSP3") %>%
+  addPolygons(data=touri,opacity = 1,
+              fillOpacity = 0.8,weight = 2,
+              fillColor = "#C800F4",color="#C800F4",
+              group="Zones touristiques")%>%
+  addPolylines(data=lincom,opacity = 1,fillOpacity = 0.5,weight = 2,
+               fillColor = "grey",
+               color="black",
+               group="Linéaires commerciaux")  %>%
+  addPolygons(data=iris_apur_75,opacity = 1,
+              fillOpacity = 0,weight = 0.4,
+              popup = ~paste(C_IR,L_IR),
+              group="Code IRIS")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 1.2,color="black",
+              group="Code postal")%>%
+  addPolylines(data=lignes_metro_75,color = ~colour,
+               weight =2,group="Lignes métro")%>%
+  addLabelOnlyMarkers(
+    data=tr_75,label = ~nom,
+    labelOptions = labelOptions(noHide = T, direction = 'top',
+                                textOnly = FALSE,
+                                textsize = "10px"),
+    group="Stations métro"
+  )%>%
+  # Layers control
+  addLayersControl(
+    overlayGroups = c("Contours ratio CSP3",
+                      "Code postal","Code IRIS",
+                      "Linéaires commerciaux",
+                      "Lignes métro","Stations métro",
+                      "Zones touristiques"),
+    options = layersControlOptions(collapsed = FALSE))%>%
+  leaflet::addLegend(position="bottomright",
+                     colors=rev(colfunc(NLEV)),labels=levels(LEVS))
+
+```
+
+
+
+
+
+# Informations
+
+## Row {.tabset}
+
+### sources des données
+
+- Sirene: https://www.sirene.fr/
+- Contours IRIS: https://www.insee.fr/fr/information/2017372
+- Population et CSP: https://www.insee.fr/fr/statistiques/4799309
+
+
+
+

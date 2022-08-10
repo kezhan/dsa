@@ -1,0 +1,438 @@
+
+
+```{r}
+reg_stat$CODE_REG
+dput(reg_stat$CODE_REG)
+```
+
+
+```{r}
+
+liste_reg=c("27", "84", "28", "44", "24", 
+            "75", "11", "32", "53", "76", 
+            "52", "93")
+
+for (reg_j in liste_reg){
+  officer::read_pptx("../data/template.pptx") %>%
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_reg(reg_j), bg = "NA"), 
+                     officer::ph_location(left=1,top=1,height = 6,width=6)) %>%
+    base::print(
+      target = paste0("pptx/",
+                      format(Sys.time(),"%Y%m%d_%H%M"),reg_j,
+                      "_carto.pptx")
+    )
+}
+
+```
+
+
+
+
+# Final avec ronds
+
+
+```{r}
+dput(cp_bp[,.N,by=lib_bp]$lib_bp)
+bp_cli[,.N,by=tranches_ca]
+bp_cli[,.N,by="SEG_ETUDE_TPE"]
+```
+
+```{r}
+bp_cli[SEG_ETUDE_TPE=="Haut du Pro",.N,by=tranches_ca]
+
+bp_cli[SEG_ETUDE_TPE=="Haut du Pro",.N,by=tranches_ca]
+
+
+bp_cli[annee=="2020" & cd_postal_cli == 13100 ,.N,by=c("tranches_ca","SEG_ETUDE_TPE")]%>%
+  spread(SEG_ETUDE_TPE,N)
+
+bp_cli$dep=substr(as.character(bp_cli$cd_postal_cli),1,2)
+
+bp_cli[dep=="13",.N,by=cd_postal_cli]
+
+```
+
+
+```{r}
+
+liste_bp=c("BPRI", "BPBFC", "BPACA", "BPN", "BPGO", "BPMED", "BPALC", 
+           "BPS", "BPAURA", "BPOC", "BPVF")
+banque_j="BPS"
+SEG_ETUDE_TPE_i="Haut du Pro"
+
+
+for (banque_j in liste_bp){
+  
+  officer::read_pptx("../data_bpce/template_bpce.pptx") %>%
+    # simple
+    
+    # avec ronds par commune
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_ccom(tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Haut du Pro"), bg = "NA"), 
+                     officer::ph_location(left=0)) %>%
+    
+        # avec ronds par commune
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_ccom(tranches_ca_i="1.5-3 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise"), bg = "NA"), 
+                     officer::ph_location(left=3)) %>%
+        # avec ronds par commune
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_ccom(tranches_ca_i="3-5 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise"), bg = "NA"), 
+                     officer::ph_location(left=6)) %>%
+    
+    # avec ronds par commune
+    officer::on_slide(index=3) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_cdep(tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Haut du Pro"), bg = "NA"), 
+                     officer::ph_location(left=0)) %>%
+    
+    # avec ronds par dép
+    officer::on_slide(index=3) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_cdep(tranches_ca_i="1.5-3 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise"), bg = "NA"), 
+                     officer::ph_location(left=3)) %>%
+        # avec ronds par dép
+    officer::on_slide(index=3) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_cdep(tranches_ca_i="3-5 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise"), bg = "NA"), 
+                     officer::ph_location(left=6)) %>%
+        # avec par département pi
+    officer::on_slide(index=3) %>%
+    officer::ph_with(carto_banque_cli_cdep_bar(tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Haut du Pro"), 
+                     officer::ph_location(left=0,top = 3,width=2,height = 2)) %>%
+    
+    # avec ronds par dép
+    officer::on_slide(index=3) %>%
+    officer::ph_with(carto_banque_cli_cdep_bar(tranches_ca_i="1.5-3 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise"), 
+                     officer::ph_location(left=3,top = 3,width = 3,height = 3)) %>%
+        # avec ronds par dép
+    officer::on_slide(index=3) %>%
+    officer::ph_with(carto_banque_cli_cdep_bar(tranches_ca_i="3-5 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise"), 
+                     officer::ph_location(left=6,top = 3,width=4,height = 4)) %>%
+    # avec ronds par commune
+    # officer::on_slide(index=9) %>%
+    # officer::ph_with(rvg::dml(ggobj =carto_banque_cli_bps_zoom(tranches_ca_i="> 5 M",
+    #                                                            banque_i=banque_j,
+    #                                                            SEG_ETUDE_TPE_i="Entreprise")), officer::ph_location(left=1)) %>%
+    
+    
+        # avec facet
+    officer::on_slide(index=4) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_ccom_3seg(banque_i=banque_j), bg = "NA"), 
+                     officer::ph_location(left=-2,width = 12)) %>%
+       # avec PL et PLS
+    officer::on_slide(index=5) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_ccom(type="PL",
+                                                           tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="PL"), bg = "NA"), 
+                     officer::ph_location(left=0)) %>%
+    
+        # avec ronds par commune
+    officer::on_slide(index=5) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_ccom(type="PLS",
+                                                           tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="PLS"), bg = "NA"), 
+                     officer::ph_location(left=3)) %>%
+    # export slide -----
+  base::print(
+    target = paste0("pptx/",format(Sys.time(),"%Y%m%d_%H%M"),"_",banque_j,"_",
+                    "carto.pptx")
+    
+  )
+  
+  
+}
+
+
+
+```
+
+# uniquement dép
+
+
+```{r}
+
+liste_bp=c("BPRI", "BPBFC", "BPACA", "BPN", "BPGO", "BPMED", "BPALC", 
+           "BPS", "BPAURA", "BPOC", "BPVF")
+banque_j="BPS"
+SEG_ETUDE_TPE_i="Haut du Pro"
+
+
+for (banque_j in liste_bp){
+  
+  officer::read_pptx("../data_bpce/template_bpce.pptx") %>%
+        # avec ronds par commune
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_marche(tranches_ca_i="none",tsiren="t500k_1M5",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Haut du Pro")$p, bg = "NA"), 
+                     officer::ph_location(left=0)) %>%
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_marche(tranches_ca_i="1.5-3 M",tsiren="t1M5_3M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$p, bg = "NA"), 
+                     officer::ph_location(left=3)) %>%
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_marche(tranches_ca_i="3-5 M",tsiren="t3M_5M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$p, bg = "NA"), 
+                     officer::ph_location(left=6)) %>%
+    # avec ronds par commune
+    officer::on_slide(index=3) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_cdep(tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Haut du Pro")$p, bg = "NA"), 
+                     officer::ph_location(left=0)) %>%
+    officer::on_slide(index=3) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_cdep(tranches_ca_i="1.5-3 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$p, bg = "NA"), 
+                     officer::ph_location(left=3)) %>%
+    officer::on_slide(index=3) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_cdep(tranches_ca_i="3-5 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$p, bg = "NA"), 
+                     officer::ph_location(left=6)) %>%
+        # bar par département
+    officer::on_slide(index=3) %>%
+    officer::ph_with(carto_banque_cli_cdep_bar(tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Haut du Pro")$g, 
+                     officer::ph_location(left=0.5,top = 3.5,width=2.5,height = 2)) %>%
+    
+    # avec ronds par dép
+    officer::on_slide(index=3) %>%
+    officer::ph_with(carto_banque_cli_cdep_bar(tranches_ca_i="1.5-3 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$g, 
+                     officer::ph_location(left=3.5,top = 3.5,width = 2.5,height = 2)) %>%
+        # avec ronds par dép
+    officer::on_slide(index=3) %>%
+    officer::ph_with(carto_banque_cli_cdep_bar(tranches_ca_i="3-5 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$g, 
+                     officer::ph_location(left=6.5,top = 3.5,width=2.5,height = 2)) %>%
+     # tables de données par regions
+    officer::on_slide(index=4) %>%
+    officer::ph_with(fontsize(flextable(carto_banque_cli_cdep_bar(tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Haut du Pro")$d),size=10), 
+                     officer::ph_location(left=0.5,top = 1,width=1,height = 1)) %>%
+    officer::on_slide(index=4) %>%
+    officer::ph_with(fontsize(flextable(carto_banque_cli_cdep_bar(tranches_ca_i="1.5-3 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$d),size=10), 
+                     officer::ph_location(left=3.5,top = 1,width = 1,height = 1)) %>%
+    officer::on_slide(index=4) %>%
+    officer::ph_with(fontsize(flextable(carto_banque_cli_cdep_bar(tranches_ca_i="3-5 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$d),size=10), 
+                     officer::ph_location(left=6.5,top = 1,width=1,height = 2)) %>%
+    # avec ronds par commune
+    # officer::on_slide(index=9) %>%
+    # officer::ph_with(rvg::dml(ggobj =carto_banque_cli_bps_zoom(tranches_ca_i="> 5 M",
+    #                                                            banque_i=banque_j,
+    #                                                            SEG_ETUDE_TPE_i="Entreprise")), officer::ph_location(left=1)) %>%
+    
+
+       # avec PL et PLS
+    officer::on_slide(index=5) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_cdep(type="PL",
+                                                           tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="PL")$p, bg = "NA"), 
+                     officer::ph_location(left=0)) %>%
+    officer::on_slide(index=5) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_cdep(type="PLS",
+                                                           tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="PLS")$p, bg = "NA"), 
+                     officer::ph_location(left=3)) %>%
+           # avec PL et PLS data
+    officer::on_slide(index=6) %>%
+    officer::ph_with(fontsize(flextable(carto_banque_cli_cdep(type="PL",
+                                                           tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="PL")$d),size=10), 
+                     officer::ph_location(left=1)) %>%
+    officer::on_slide(index=6) %>%
+    officer::ph_with(fontsize(flextable(carto_banque_cli_cdep(type="PLS",
+                                                           tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="PLS")$d),size=10), 
+                     officer::ph_location(left=3)) %>%
+    # export slide -----
+  base::print(
+    target = paste0("pptx/",format(Sys.time(),"%Y%m%d_%H%M"),"_",banque_j,"_",
+                    "carto.pptx")
+    
+  )
+  
+  
+}
+
+
+```
+
+## avec dep
+
+```{r}
+tranches_ca_i="none"
+banque_i=banque_j
+SEG_ETUDE_TPE_i="Haut du Pro"
+
+```
+
+
+```{r}
+
+liste_bp=c("BPRI", "BPBFC", "BPACA", "BPN", "BPGO", "BPMED", "BPALC", 
+           "BPS", "BPAURA", "BPOC", "BPVF")
+banque_j="BPS"
+SEG_ETUDE_TPE_i="Haut du Pro"
+
+for (banque_j in liste_bp){
+  
+  officer::read_pptx("../data_bpce/template_bpce.pptx") %>%
+    # FDC
+    officer::on_slide(index=5) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_cdep(tranches_ca_i="none",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Haut du Pro")$p, bg = "NA"), 
+                     officer::ph_location(left=0)) %>%
+    officer::on_slide(index=5) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_cdep(tranches_ca_i="1.5-3 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$p, bg = "NA"), 
+                     officer::ph_location(left=3)) %>%
+    officer::on_slide(index=5) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_cli_cdep(tranches_ca_i="3-5 M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$p, bg = "NA"), 
+                     officer::ph_location(left=6)) %>%
+    # marché global
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_marche(type="Pas PL",tranches_ca_i="none",tsiren="total",
+                                                         banque_i=banque_j,
+                                                         SEG_ETUDE_TPE_i="none")$p, bg = "NA"), 
+                     officer::ph_location(left=0)) %>%
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_marche(type="Pas PL",tranches_ca_i="none",tsiren="total",
+                                                         banque_i=banque_j,
+                                                         SEG_ETUDE_TPE_i="none")$pdep, bg = "NA"), 
+                     officer::ph_location(left=4)) %>%
+    officer::on_slide(index=4) %>%
+    officer::ph_with(carto_banque_marche(type="Pas PL",tranches_ca_i="none",tsiren="total",
+                                         banque_i=banque_j,
+                                         SEG_ETUDE_TPE_i="none")$d,
+                     officer::ph_location(left=0,height = 2,width=8)) %>%
+    # marché deux tranches
+    officer::on_slide(index=3) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_marche(type="Pas PL",tranches_ca_i="none",tsiren="t500k_1M5",
+                                                         banque_i=banque_j,
+                                                         SEG_ETUDE_TPE_i="none")$p, bg = "NA"), 
+                     officer::ph_location(left=0)) %>%
+    officer::on_slide(index=3) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_marche(type="Pas PL",tranches_ca_i="none",
+                                                         tsiren="t1M5_5M",
+                                                         banque_i=banque_j,
+                                                         SEG_ETUDE_TPE_i="none")$p, bg = "NA"), 
+                     officer::ph_location(left=4)) %>%
+    # tables de données par regions
+    
+    # avec ronds par commune
+    # officer::on_slide(index=9) %>%
+    # officer::ph_with(rvg::dml(ggobj =carto_banque_cli_bps_zoom(tranches_ca_i="> 5 M",
+    #                                                            banque_i=banque_j,
+    #                                                            SEG_ETUDE_TPE_i="Entreprise")), officer::ph_location(left=1)) %>%
+    
+    # export slide -----
+  base::print(
+    target = paste0("pptx/",format(Sys.time(),"%Y%m%d_%H%M"),"_",banque_j,"_",
+                    "marche_fdc.pptx")
+    
+  )
+  
+  
+}
+
+
+```
+
+# taux de pénétration
+
+
+```{r}
+
+liste_bp=c("BPRI", "BPBFC", "BPACA", "BPN", "BPGO", "BPMED", "BPALC", 
+           "BPS", "BPAURA", "BPOC", "BPVF")
+banque_j="BPS"
+SEG_ETUDE_TPE_i="Haut du Pro"
+
+
+for (banque_j in liste_bp){
+  
+  officer::read_pptx("../data_bpce/template_bpce.pptx") %>%
+        # avec ronds par commune
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_marche(tranches_ca_i="none",tsiren="t500k_1M5",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Haut du Pro")$p, bg = "NA"), 
+                     officer::ph_location(left=0)) %>%
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_marche(tranches_ca_i="1.5-3 M",tsiren="t1M5_3M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$p, bg = "NA"), 
+                     officer::ph_location(left=3)) %>%
+    officer::on_slide(index=2) %>%
+    officer::ph_with(rvg::dml(ggobj =carto_banque_marche(tranches_ca_i="3-5 M",tsiren="t3M_5M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$p, bg = "NA"), 
+                     officer::ph_location(left=6)) %>%
+        # avec ronds par commune
+    officer::on_slide(index=3) %>%
+    officer::ph_with(fontsize(flextable(carto_banque_marche(tranches_ca_i="none",tsiren="t500k_1M5",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Haut du Pro")$d),size=10), 
+                     officer::ph_location(left=0)) %>%
+    officer::on_slide(index=3) %>%
+    officer::ph_with(fontsize(flextable(carto_banque_marche(tranches_ca_i="1.5-3 M",tsiren="t1M5_3M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$d),size=10), 
+                     officer::ph_location(left=3)) %>%
+    officer::on_slide(index=3) %>%
+    officer::ph_with(fontsize(flextable(carto_banque_marche(tranches_ca_i="3-5 M",tsiren="t3M_5M",
+                                                           banque_i=banque_j,
+                                                           SEG_ETUDE_TPE_i="Petite Entreprise")$d),size=10), 
+                     officer::ph_location(left=6)) %>%
+    # export slide -----
+  base::print(
+    target = paste0("pptx/",format(Sys.time(),"%Y%m%d_%H%M"),"_",banque_j,"_",
+                    "marche.pptx")
+    
+  )
+  
+  
+}
+
+
+
+```

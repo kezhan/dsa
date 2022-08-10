@@ -1,0 +1,204 @@
+---
+title: "Carto ratio CSP"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    navbar:
+      - { title: "Accueil", href: "index.html", align: right}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# CSP `r i` :  `r varcspnames[i]`
+
+
+## Row {.tabset}
+
+### Sans lissage
+
+```{r,eval=FALSE}
+cspi="ratio_csp1"
+
+# https://towardsdatascience.com/nearest-neighbour-analysis-with-geospatial-data-7bcd95f34c0e
+
+for (i in 1:8){
+  print(range(ban_75_ech_df_iris_csp[[paste0("ratio_csp",i)]],na.rm = T))
+}
+
+```
+
+
+```{r}
+
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addCircles(data=ban_75_ech_df_iris_csp,radius = 1,
+             color = ~pal_num(get(cspi)))%>%
+  leaflet::addLegend(data=ban_75_ech_df_iris_csp,position="bottomright",
+                     pal=pal_num,values=~get(cspi),title ="Valeur")
+
+
+```
+
+### KNN
+
+```{r,eval=FALSE}
+# base ban
+ban_75_ech=ban_75[sample(nrow(ban_75),nrow(ban_75)*0.1),]
+
+iris_75_df=st_as_sf(iris_75)
+
+ban_75_ech_df=sf::st_as_sf(ban_75_ech[,c("lon","lat")],
+                            coords=c("lon","lat"),
+                            crs=st_crs(iris_75_df))
+
+# ban_75_ech_df=sf::st_as_sf(ban_75[,c("lon","lat")],
+#                             coords=c("lon","lat"),
+#                             crs=st_crs(iris_75_df))
+
+ban_75_ech_df_iris <- ban_75_ech_df %>% dplyr::mutate(
+  intersection = as.integer(st_intersects(geometry, iris_75_df)),
+  code_iris = if_else(is.na(intersection), "", 
+                      as.character(iris_75_df$CODE_IRIS[intersection]))
+)
+
+```
+
+```{r,eval=FALSE}
+iris_75_df_data=data.table(iris_75_df)
+
+iris_75_df_data$C_IR=as.character(iris_75_df_data$C_IR)
+
+iris_csp_75=csp_75%>%
+  merge(iris_75_df_data,
+        by.y="C_IR",
+        by.x="IRIS")%>%
+  mutate(densite_C17_POP15P=C17_POP15P/M2_POP)
+
+write.csv2(iris_csp_75,file="iris_csp_75.csv",sep=";")
+
+```
+
+
+
+```{r}
+
+
+coords <- st_coordinates((ban_75_ech_df_iris_csp))
+IDs<-row.names(ban_75_ech_df_iris_csp)
+
+
+# Creating a list of neighbors for each location, using the 5 nearest neighbors 
+# knn50 <- knn2nb(knearneigh(coords, k = 300, longlat=TRUE), row.names = IDs)
+
+#knn_cl <- knn2nb(knearneigh(coords, k = 30, longlat=F), row.names = IDs)
+knn_longlat <- knn2nb(knearneigh(coords, k = 200, longlat=F), row.names = IDs)
+
+# knn50 <- include.self(knn50)
+
+value_smooth=sapply(1:length(knn_longlat),
+                    function(N){
+                      sum(ban_75_ech_df_iris_csp[[cspi]][knn_longlat[[N]]]*
+                            ban_75_ech_df_iris_csp[["densite_C17_POP15P"]][knn_longlat[[N]]],na.rm = T)/
+                        sum(ban_75_ech_df_iris_csp[["densite_C17_POP15P"]][knn_longlat[[N]]],na.rm = T)
+                    })
+
+print(max(value_smooth))
+value_smooth[1]=0
+value_smooth[2]=0.5
+
+```
+
+```{r,eval=FALSE}
+# pour un seul point
+obs_i=2900
+
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addCircles(data=ban_75_ech_df_iris_csp[obs_i,],radius = 15,
+             color ="black",fillColor = "black")%>%
+  # addCircles(data=ban_75_ech_df_iris_csp[knn_cl[[obs_i]],],radius = 1,
+  #            color = ~pal_num(get(cspi)),
+  #            popup = ~paste0("taux csp: ",get(cspi)))%>%
+  addCircles(data=ban_75_ech_df_iris_csp[knn_longlat[[obs_i]],],radius = 10,
+             popup = ~paste0("taux csp: ",get(cspi)))
+
+
+```
+
+
+```{r,eval=FALSE}
+value_smooth=sapply(1:length(knn50),
+                    function(N){
+                      mean(ban_75_ech_df_iris_csp[[cspi]][knn50[[N]]])
+                    })
+
+# local G stat
+echantillon=sample(nrow(ban_75),nrow(ban_75)*0.1)
+
+# Creating the localG statistic for each of counties, with a k-nearest neighbor value of 5, and round this to 3 decimal places
+value_smooth <- localG(x = as.numeric(ban_75_ech_df_iris_csp[[cspi]]), 
+                       listw = nb2listw(knn50, style = "B"), 
+                       zero.policy = F)
+value_smooth <- round(value_smooth,3)
+
+
+```
+
+```{r}
+
+ban_75_ech_df_iris_csp_w=dplyr:::bind_cols(ban_75_ech_df_iris_csp,
+                                           ratio_csp_w=as.numeric(value_smooth))
+
+
+
+# https://stackoverflow.com/questions/45776232/define-palette-breaks-for-leaflet
+
+intervalles <-seq(0,0.5,0.05)
+
+pal_num <- colorBin( c("blue","yellow","red"), 
+                      bins=intervalles, na.color = "#aaff56")
+
+
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addCircles(data=ban_75_ech_df_iris_csp_w,radius = 1,
+             color = ~pal_num(ratio_csp_w))%>%
+  leaflet::addLegend(data=ban_75_ech_df_iris_csp_w,
+                     position="bottomright",
+                     pal=pal_num,
+                     values=~ratio_csp_w,
+                     title ="Valeur")%>%
+  
+  addPolygons(data=iris_75,opacity = 0.3,fillOpacity = 0,weight = 0.8)%>%
+  addPolygons(data=cp_75,opacity = 0.7,fillOpacity = 0,weight = 0.8,color = "black")
+
+```
+
+
+```{r,eval=FALSE}
+# test palette
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, n = 20)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addCircles(data=ban_75_ech_df_iris_csp_w,radius = 1,
+             color = ~pal_num(ratio_csp_w))%>%
+  leaflet::addLegend(data=ban_75_ech_df_iris_csp_w,
+                     position="bottomright",
+                     pal=pal_num,
+                     values=~ratio_csp_w,
+                     title ="Valeur")%>%
+  
+  addPolygons(data=iris_75,opacity = 0.3,fillOpacity = 0,weight = 0.8)%>%
+  addPolygons(data=cp_75,opacity = 0.7,fillOpacity = 0,weight = 0.8,color = "black")
+```
+

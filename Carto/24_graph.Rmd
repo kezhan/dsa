@@ -1,0 +1,228 @@
+---
+title: "Graphes des transports en commun"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    navbar:
+      - { title: "Accueil", href: "index.html", align: right}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r,eval=FALSE}
+# fichier sur le network à refaire si besoin, car toutes les correspondances ne sont pas précisées
+# https://luukvdmeer.github.io/sfnetworks/articles/intro.html
+# https://geocompr.robinlovelace.net/location.html
+
+
+```
+
+# Transports
+
+## Row {.tabset}
+
+### Données
+
+```{r}
+trfreq[,c("mode","Station","Trafic","Rang")]%>%
+  datatable(rownames = F,filter = "top")
+
+```
+
+### Trafic 1
+
+
+```{r}
+
+leaflet() %>% 
+  addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=touri,opacity = 1,
+              fillOpacity = 0.5,weight = 2,
+              fillColor = "grey",color="black")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8,group="Code postal")%>%
+  addCircles(data=tr_75_trafic,radius = ~Trafic/10000,group="trafic")%>%
+  addPolylines(data=lignes_metro_75,color = ~colour,
+               weight =0.8,group="Lignes métro")%>%
+  addLabelOnlyMarkers(
+    data=tr_75,label = ~nom,
+    labelOptions = labelOptions(noHide = T, direction = 'top',
+                                textOnly = FALSE,
+                                textsize = "10px"),
+    group="Stations métro"
+  )%>%
+  # Layers control
+  addLayersControl(
+    overlayGroups = c("Code postal","Code IRIS","Lignes métro","Stations métro","trafic"),
+    options = layersControlOptions(collapsed = FALSE))
+
+
+```
+
+### Trafic
+
+
+```{r}
+leaflet() %>% 
+  addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=touri,opacity = 1,
+              fillOpacity = 0.5,weight = 2,
+              fillColor = "grey",color="black",
+              group="Zones touristiques")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = 0.1)%>%
+    addPolylines(data=lignes_metro_75,color = ~colour,weight =2,opacity = 1,
+               group="Lignes métro")%>%
+  addCircles(data=subset(tr_75_trafic,mode.y=="Metro"),
+             radius = ~Trafic/40000,popup=~nom,weight = 2,
+             group="Trafic Métro")%>%
+  addCircles(data=subset(tr_75_trafic,mode.y=="RER"),
+             radius = ~Trafic/40000,popup=~nom,
+             color="red",group="Trafic RER")%>%
+  # Layers control
+  addLayersControl(
+    overlayGroups = c("Code postal","Code IRIS","Lignes métro","Stations métro",
+                      "Trafic Métro",
+                      "Trafic RER",
+                      "Zones touristiques"),
+    options = layersControlOptions(collapsed = FALSE))
+
+
+```
+
+# Centralité
+
+## Row {.tabset}
+
+### Données
+
+```{r,eval=FALSE}
+library(dplyr)
+library(tidygraph)
+library(ggraph)
+
+
+links <- read.csv2("../data/transports/metro_paris_network.csv")
+links=links[,1:5]
+names(links) <- c("from","from_name","to","to_name","res_com") #for tbl_graph
+links=links[,c("from","to")]
+
+nodes=data.table(tr_data[,c("id_ref_lda","nom","mode")])
+
+library(igraph)
+
+net = graph_from_data_frame(links,vertices = nodes,directed = T)
+
+g =graph_from_data_frame(links,directed = T)
+
+
+plot(g)
+```
+
+
+```{r,eval=FALSE}
+tr_bet=betweenness(
+  g,
+  v = V(g),
+  directed = TRUE,
+  weights = NULL,
+  nobigint = TRUE,
+  normalized = FALSE
+)
+
+
+
+betweenness=data.table(id_ref_lda=names(tr_bet),betweenness=tr_bet)%>%
+  mutate(id_ref_lda=as.numeric(id_ref_lda))
+
+
+eig=data.table(id_ref_lda=names(evcent(g)$vector),eig=evcent(g)$vector)%>%
+  mutate(id_ref_lda=as.numeric(id_ref_lda))
+
+authority_score=data.table(id_ref_lda=names(authority.score(g)$vector),authorityscore=authority.score(g)$vector)%>%
+  mutate(id_ref_lda=as.numeric(id_ref_lda))
+
+hub_score=data.table(id_ref_lda=names(hub.score(g)$vector),hubscore=hub.score(g)$vector)%>%
+  mutate(id_ref_lda=as.numeric(id_ref_lda))
+
+Closeness =data.table(id_ref_lda=names(closeness(g)),closeness=closeness(g))%>%
+  mutate(id_ref_lda=as.numeric(id_ref_lda))
+
+centralities = betweenness%>%
+  merge(authority_score,by="id_ref_lda")%>%
+    merge(eig,by="id_ref_lda")%>%
+  merge(hub_score,by="id_ref_lda")%>%
+  merge(Closeness,by="id_ref_lda")%>%
+  merge(unique(nodes),by="id_ref_lda")%>%
+  arrange(desc(betweenness))
+
+
+ 
+```
+
+
+```{r}
+unique(centralities)%>%
+  select(id_ref_lda,nom,betweenness)%>%
+  unique()%>%
+  datatable(rownames = F)
+```
+
+```{r}
+centralite_75=unique(centralities)%>%
+  select(id_ref_lda,betweenness,closeness)%>%
+  unique()
+
+
+datatable(centralite_75,rownames = F)
+```
+
+### Carto
+
+
+```{r,eval=FALSE}
+centralite_75[,.N,by=id_ref_lda][order(-N)]
+
+tr_75=unique(tr_75@data$nom)
+
+
+tr_75_centralites=merge(subset(tr_75,gares_id %in% tr_data_75_unique$gares_id),
+                   centralite_75,
+                   by="id_ref_lda")
+
+centralite_75[id_ref_lda==71359]
+```
+
+```{r}
+leaflet() %>% 
+  addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=touri,opacity = 1,
+              fillOpacity = 0.5,weight = 2,
+              fillColor = "grey",color="black",
+              group="Zones touristiques")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = 0.1)%>%
+    addPolylines(data=lignes_metro_75,color = ~colour,weight =2,opacity = 1,
+               group="Lignes métro")%>%
+  addCircles(data=tr_75_centralites,
+             radius = ~betweenness/80,
+             popup=~nom,
+             color="purple",group="Centralité")%>%
+  # Layers control
+  addLayersControl(
+    overlayGroups = c("Code postal","Code IRIS","Lignes métro","Stations métro",
+                      "Centralité",
+                      "Zones touristiques"),
+    options = layersControlOptions(collapsed = FALSE))
+```
+
+
+# Informations
+
+## Row {.tabset}
+
+### sources des données
+
+- Sirene: https://www.sirene.fr/
+- Trafic annuel entrant: https://dataratp.opendatasoft.com/explore/dataset/trafic-annuel-entrant-par-station-du-reseau-ferre-2020/export/

@@ -1,0 +1,1446 @@
+
+# Données
+
+## Codes postaux
+
+
+```{r,eval=FALSE}
+# Codes postaux
+
+cp=readOGR("../data/shapefiles/codes_postaux/codes_postaux_region.shp",
+            layer="codes_postaux_region")
+names(cp)
+
+cp=spTransform(cp, CRS("+proj=longlat +datum=WGS84"))
+
+cp_75=subset(cp,DEP=="75")
+
+# cp[cp$DEP=="75"]
+```
+
+
+```{r}
+
+cp_bp=read.xlsx("../data_bpce/Corresp_CPostaux_BP v1.xlsx",startRow = 1, colNames = TRUE,
+                    skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+                    namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()
+
+
+cpp_i=subset(cpp,code_postal %in% cp_bp[lib_bp=="BPRI"]$COPOST)
+
+cp_i=subset(cp,ID %in% cp_bp[lib_bp=="BPRI"]$COPOST)
+
+plot(cp_i)
+
+cp_bp[,.N,by=lib_bp]
+
+
+
+```
+
+
+```{r}
+DEP_i=cp_i$DEP
+dep_i <- unionSpatialPolygons(cp_i, DEP_i)
+plot(dep_i)
+names(dep.t_i)
+```
+
+
+predictions
+
+```{r}
+
+
+siren_pred=readRDS("../data_bpce/siren.pred.rds")
+
+cp_sirene=siren_pred[,.N,by=c("class","codePostalEtablissement")]%>%
+  spread(class,N)
+cp_sirene[,.N,by="codePostalEtablissement"]
+cp_sirene$cp=as.numeric(cp_sirene$codePostalEtablissement)
+```
+
+
+## Données
+
+PL: pas de bas du pro
+
+```{r}
+bp_cli[,.N,by=SEG_ETUDE_TPE]
+```
+
+
+```{r}
+TCD <- bp_cli %>% filter(annee=="2020",id_bp=="BPS") %>% group_by(SEG_ETUDE_TPE) %>% summarise(nb=n())
+bp_cli2[id_bp=="BPS",.N,by=SEG_ETUDE_TPE]
+bp_cli2[,.N,by="SEG_ETUDE_TPE"]
+
+```
+mais 
+
+```{r}
+bp_cli[SEG_ETUDE_TPE=="Haut du Pro",seg:="Haut_du_Pro"]
+bp_cli[SEG_ETUDE_TPE=="Petite Entreprise" & tranches_ca =="1.5-3 M",seg:="PE_1.5_3M"]
+bp_cli[SEG_ETUDE_TPE=="Petite Entreprise" & tranches_ca =="3-5 M",seg:="PE_3_5M"]
+
+bp_cli[sous_seg_marche=="PL" ,PL:=1]
+bp_cli[sous_seg_marche=="PL" & 
+         Regroupement.Metier  == "Professions médicales et para-médicales",PLS:=1]
+
+bp_cli2=bp_cli[annee=="2020" & is.na(seg)==F]
+```
+
+
+```{r}
+nrow(bp_cli2)
+length(unique(bp_cli2$mat_cli))
+
+bp_par_cp=bp_cli2[,.N,by=c("cd_postal_cli","seg","id_bp")]%>%
+  spread(seg,N)
+
+
+
+```
+
+
+```{r}
+cp@data$ID=as.numeric(cp@data$ID)
+```
+
+
+```{r}
+cp_data=cp@data%>%data.table()
+
+cp_data$ID=as.numeric(cp_data$ID)
+cp_data$present_shp=1
+cp_bp$present_bp=1
+
+cp_base=merge(cp_data,cp_bp,by.x="ID",by.y="COPOST",all=T)%>%
+  merge(bp_par_cp,.,by.x="cd_postal_cli",by.y="ID",all=T)
+
+cp_base$hors_zone
+
+cp_base[lib_bp!=id_bp]
+
+write.xlsx(cp_base[lib_bp!=id_bp],file="output/base_cp_out.xlsx")
+write.xlsx(cp_base[lib_bp==id_bp],file="output/base_cp_in.xlsx")
+
+```
+
+```{r}
+cp_base[,.(Haut_du_Pro=sum(Haut_du_Pro,na.rm=T),
+           PE_1.5_3M=sum(PE_1.5_3M,na.rm=T),
+           PE_3_5M=sum(PE_3_5M,na.rm=T)),
+        by=c("lib_bp")]
+
+cp_base[,.(Haut_du_Pro=sum(Haut_du_Pro,na.rm=T),
+           PE_1.5_3M=sum(PE_1.5_3M,na.rm=T),
+           PE_3_5M=sum(PE_3_5M,na.rm=T))]
+
+```
+
+
+## Carto
+
+
+```{r}
+dep_i_df <- fortify(spTransform(dep_i, CRS("+proj=longlat +datum=WGS84")))
+cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+```
+
+
+```{r}
+ggplot()+
+  geom_polygon(data=cp_i_df,aes(long,lat,group=group,fill=hole),
+               colour="black",alpha=0)+
+  geom_polygon(data=dep_i_df,aes(long,lat,group=group,fill=hole),
+               colour="red",alpha=0)+
+  coord_map()+theme_void()+labs(title="Départements français")+
+  # scale_fill_manual(values = c("blue", "white"))+ 
+  theme(legend.position = "none")
+
+```
+
+## Fonction pour une banque
+
+
+```{r}
+cp_bp[,.N,by=lib_bp]
+banque_i="BPACA"
+
+
+carto_banque=function(banque_i){
+  
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  DEP_i=cp_i$DEP
+  dep_i <- unionSpatialPolygons(cp_i, DEP_i)
+  
+  dep_i_df <- fortify(spTransform(dep_i, CRS("+proj=longlat +datum=WGS84")))
+  cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  
+  p=ggplot()+
+    geom_polygon(data=cp_i_df,aes(long,lat,group=group,fill=hole),
+                 colour="black",alpha=0,size=0.3)+
+    geom_polygon(data=dep_i_df,aes(long,lat,group=group,fill=hole),
+                 colour="red",alpha=0)+
+    coord_map()+theme_void()+labs(title=banque_i)+
+    # scale_fill_manual(values = c("blue", "white"))+ 
+    theme(legend.position = "none")
+  return(p)
+}
+
+carto_banque("BPACA")
+
+```
+
+
+```{r}
+p
+```
+
+# Fusion avec données
+
+## BP
+
+```{r}
+bp_cli=readRDS("../data_bpce/BP_FDC_190122.rds")%>%data.table
+bp_cli$cd_postal_cli=as.numeric(bp_cli$cd_postal_cli)
+```
+
+
+```{r}
+bp_cli[,.N,by=tranches_ca]
+bp_cli[,.N,by="SEG_ETUDE_TPE"]
+bp_cli[,.N,by=id_bp]
+
+
+```
+
+
+```{r}
+tranches_ca_i="> 5 M"
+banque_i="BPACA"
+SEG_ETUDE_TPE_i="Entreprise"
+bp_cli[annee=="2020" & tranches_ca==tranches_ca_i & id_bp==banque_i ]
+
+```
+
+
+```{r}
+
+carto_banque_cli=function(tranches_ca_i="> 5 M",
+                      banque_i="BPACA",
+                      SEG_ETUDE_TPE_i="Entreprise"){
+  
+  cli_n=bp_cli[annee=="2020" & tranches_ca==tranches_ca_i & id_bp==banque_i,.N,by="cd_postal_cli"]
+
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+
+  
+  
+  DEP_i=cp_i$DEP
+  dep_i <- unionSpatialPolygons(cp_i, DEP_i)
+  
+  dep_i_df <- fortify(spTransform(dep_i, CRS("+proj=longlat +datum=WGS84")))
+  cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  
+  cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  
+  p=ggplot()+
+    geom_polygon(data=cp_i_df,aes(long,lat,group=group,fill=N),
+                 colour="black",alpha=0.5,size=0.3)+
+    geom_polygon(data=dep_i_df,aes(long,lat,group=group),
+                 colour="red",alpha=0)+
+    coord_map()+theme_void()+labs(title=paste(banque_i," - Segment: ",SEG_ETUDE_TPE_i," - Tranche CA: ",tranches_ca_i))
+    # scale_fill_manual(values = c("blue", "white"))+ 
+    # theme(legend.position = "none")
+
+  return(p)
+}
+
+p
+
+```
+
+## Départements
+
+```{r}
+bp_cli[,.N,by=annee]
+```
+
+```{r}
+
+banque_i="BPS"
+
+carto_banque_cli_cdep=function(tranches_ca_i="> 5 M",
+                               banque_i="BPACA",
+                               SEG_ETUDE_TPE_i="Entreprise"){
+  
+  
+  if (tranches_ca_i=="none"){
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                 .N,by="cd_postal_cli"]
+  } else {
+    cli_n=bp_cli[annee=="2020" & tranches_ca %in% tranches_ca_i & 
+                   id_bp==banque_i& SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                 .N,by="cd_postal_cli"]
+  }
+  
+  cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+        by.y="COPOST",all=T)
+  
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+  
+  
+  # cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  # 
+  # cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  # 
+  # comptage par département
+  cp_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  
+  dep_sf=cp_sf%>%
+    group_by(DEP) %>% 
+    dplyr::summarize(geometry = st_union(geometry),
+                     ndep=sum(N,na.rm = T))
+  
+  # using sf
+  dep_c_sf <- st_centroid(dep_sf)
+  
+  cp_c_sf <- st_centroid(cp_sf)
+  
+  p=ggplot()+
+    geom_sf(data=cp_sf,aes(fill=N),
+            colour="#C3C3C3",alpha=1,size=0.1)+
+    geom_sf(data=dep_sf,alpha=0,colour="black",size=0.2)+
+    # geom_sf(data=cp_c_sf,aes(size=N),pch=1,color="blue")+
+    # geom_sf(data=dep_c_sf,aes(size=ndep),pch=1,color="red")+
+    geom_sf_text(data=cp_c_sf[cp_c_sf$ID %in% cli_n[is.na(lib_bp)==F,][order(-N)][1:6]$cd_postal_cli,],
+                 aes(label = paste(LIB,"\n",N) ), colour = "black",size=2.6,nudge_y = -0.005)+
+    theme_void()+labs(title=paste(banque_i," - Segment: ",SEG_ETUDE_TPE_i," - Tranche CA: ",tranches_ca_i,
+                                  "\nNb client dans région banque: ",cli_n[,.(nb=sum(N,na.rm=T)),by=lib_bp][lib_bp==banque_i]$nb,
+                                  "\nNb client hors région banque: ",cli_n[,.(nb=sum(N,na.rm=T)),by=lib_bp][is.na(lib_bp)]$nb))+ 
+    theme(plot.title = element_text(size=6))+
+    scale_fill_continuous(low="#F1F1B3", high="#B425FB", 
+                          guide="colorbar",na.value="white",name="nombre de clients")+
+    theme(legend.position = "bottom")+
+  theme(legend.key.size = unit(.1, 'cm'), #change legend key size
+        legend.key.height = unit(.1, 'cm'), #change legend key height
+        legend.key.width = unit(.7, 'cm'), #change legend key width
+        legend.title = element_text(size=6), #change legend title font size
+        legend.text = element_text(size=4)) #change legend text font size
+  
+  p
+  
+}
+
+p
+ 
+
+```
+
+
+## département 2 avec pls
+
+```{r}
+bp_cli[,.N,by=SEG_ETUDE_TPE]
+
+(PL_BPS_20 <- bp_cli %>% filter(annee=="2020",id_bp=="BPS",sous_seg_marche=="PL",SEG_ETUDE_TPE=="Haut du Pro" |SEG_ETUDE_TPE=="Petite Entreprise")   %>% group_by(Regroupement.Metier) %>% summarise(nb=n()))
+sum(PL_BPS_20$nb)
+
+
+bp_cli[,.N,by=c("dep","cd_postal_cli")][order(cd_postal_cli)]
+
+
+```
+
+```{r}
+type ="PL"
+
+carto_banque_cli_cdep=function(type="Pas PL",tranches_ca_i="> 5 M",
+                               banque_i="BPACA",
+                               SEG_ETUDE_TPE_i="Entreprise"){
+  
+  if (type =="PL"){
+    # sélection cp PL
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   sous_seg_marche=="PL" & SEG_ETUDE_TPE %in% c("Haut du Pro","Petite Entreprise"),
+                 .N,by="cd_postal_cli"]
+
+    sum(cli_n$N,na.rm = T)
+    # calcul range
+    n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+    
+    # cli_n=cli_n[is.na(cd_postal_cli)==F]
+    
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],
+                by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+    
+    rg=range(cli_n$N,na.rm = T)
+    
+  } else if (type =="PLS") {
+    
+    # range avec PL
+    
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   sous_seg_marche=="PL" & SEG_ETUDE_TPE %in% c("Haut du Pro","Petite Entreprise"),
+                 .N,by="cd_postal_cli"]
+    
+    n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+    
+    # cli_n=cli_n[is.na(cd_postal_cli)==F]
+    
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],
+                by.x="cd_postal_cli",
+                by.y="COPOST")
+    
+    rg=range(cli_n$N,na.rm = T)
+    
+    
+    # selection clients pour le perimètre PLS
+    
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   sous_seg_marche=="PL" & 
+                   Regroupement.Metier  == "Professions médicales et para-médicales" & 
+                   SEG_ETUDE_TPE %in% c("Haut du Pro","Petite Entreprise"),
+                 .N,by="cd_postal_cli"]
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],
+                by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+    
+  } else {
+    
+    cli_n=bp_cli2[,.N,by=c("cd_postal_cli","seg")]
+    
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+                by.y="COPOST")
+    
+    rg=range(cli_n$N,na.rm = T)
+    
+    
+    if (tranches_ca_i=="none"){
+      cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                     SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                   .N,by="cd_postal_cli"]
+      
+      cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+      n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+      
+    } else {
+      cli_n=bp_cli[annee=="2020" & tranches_ca %in% tranches_ca_i & 
+                     id_bp==banque_i& SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                   .N,by="cd_postal_cli"]
+      
+      cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+      n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+      
+    }
+    
+    
+    
+  }
+  
+  
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+  
+  
+  # cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  # 
+  # cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  # 
+  # comptage par département
+  cp_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  dep_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84"))) %>%
+    group_by(DEP) %>% 
+    dplyr::summarize(geometry = st_union(geometry),
+                     ndep=sum(N,na.rm = T))%>%
+    merge(dep_data,by.x="DEP",by.y="CODE_DEPT")
+  
+  # using sf
+  dep_c_sf <- st_centroid(dep_sf)
+  
+  cp_c_sf <- st_centroid(cp_sf)
+  
+  data=data.table(cp_i@data)[,.(n=sum(N,na.rm=T)),by=DEP][order(n)]
+
+  # directement avec base client
+  cli_n$cp=as.character(cli_n$cd_postal_cli)
+  # table(nchar(cli_n$cp))
+  cli_n[nchar(cp)==4,cp:=paste0("0",cp)]
+  cli_n$dep=substr(cli_n$cp,1,2)
+  data=cli_n[lib_bp==banque_i,.(n=sum(N,na.rm = T)),by=dep][order(n)]
+  
+  
+  
+  # déraptement
+    p=ggplot()+
+    geom_sf(data=cp_sf,aes(fill=N),
+            colour="#C3C3C3",alpha=1,size=0.1)+
+    geom_sf(data=dep_sf,alpha=0,colour="black",size=0.2)+
+    # geom_sf(data=cp_c_sf,aes(size=N),pch=1,color="blue")+
+    geom_sf_text(data=dep_c_sf,aes(label=paste0(NOM_DEPT,"(",DEP,")","\n",ndep)),size=2,colour="#240025")+
+    geom_sf_text(data=cp_c_sf[cp_c_sf$ID %in% cli_n[is.na(lib_bp)==F,][order(-N)][1:6]$cd_postal_cli,],
+                 aes(label = paste(LIB,"\n",N) ), colour = "black",size=2,nudge_y = 0)+
+    theme_void()+labs(title=paste(banque_i," - Segment: ",SEG_ETUDE_TPE_i," - Tranche CA: ",tranches_ca_i,
+                                  "\nNb client dans région banque: ",cli_n[,.(nb=sum(N,na.rm=T)),by=lib_bp][lib_bp==banque_i]$nb,
+                                  "\nNb client hors région banque: ",cli_n[,.(nb=sum(N,na.rm=T)),by=lib_bp][is.na(lib_bp)]$nb))+ 
+    theme(plot.title = element_text(size=6))+
+    scale_fill_continuous(low="#F1F1B3", high="#B425FB", 
+                          guide="colorbar",na.value="white",name="nombre de clients")+
+    theme(legend.position = "bottom")+
+  theme(legend.key.size = unit(.1, 'cm'), #change legend key size
+        legend.key.height = unit(.1, 'cm'), #change legend key height
+        legend.key.width = unit(.7, 'cm'), #change legend key width
+        legend.title = element_text(size=6), #change legend title font size
+        legend.text = element_text(size=4)) #change legend text font size
+  
+  p
+  return(list(p=p,d=data))
+  
+}
+
+p
+sum(data$n)
+
+```
+
+
+
+
+## département pour marché
+
+```{r}
+bp_cli[,.N,by=SEG_ETUDE_TPE]
+
+(PL_BPS_20 <- bp_cli %>% filter(annee=="2020",id_bp=="BPS",sous_seg_marche=="PL",SEG_ETUDE_TPE=="Haut du Pro" |SEG_ETUDE_TPE=="Petite Entreprise")   %>% group_by(Regroupement.Metier) %>% summarise(nb=n()))
+sum(PL_BPS_20$nb)
+
+
+bp_cli[,.N,by=c("dep","cd_postal_cli")][order(cd_postal_cli)]
+
+```
+
+```{r}
+type ="PL"
+
+carto_banque_marche=function(type="Pas PL",tranches_ca_i="> 5 M",tsiren="t500k_1M5",
+                               banque_i="BPACA",
+                               SEG_ETUDE_TPE_i="Entreprise"){
+  
+  if (type =="PL"){
+    # sélection cp PL
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   sous_seg_marche=="PL" & SEG_ETUDE_TPE %in% c("Haut du Pro","Petite Entreprise"),
+                 .N,by="cd_postal_cli"]
+
+    sum(cli_n$N,na.rm = T)
+    # calcul range
+    n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+    
+    # cli_n=cli_n[is.na(cd_postal_cli)==F]
+    
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],
+                by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+    
+    rg=range(cli_n$N,na.rm = T)
+    
+  } else if (type =="PLS") {
+    
+    # range avec PL
+    
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   sous_seg_marche=="PL" & SEG_ETUDE_TPE %in% c("Haut du Pro","Petite Entreprise"),
+                 .N,by="cd_postal_cli"]
+    
+    n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+    
+    # cli_n=cli_n[is.na(cd_postal_cli)==F]
+    
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],
+                by.x="cd_postal_cli",
+                by.y="COPOST")
+    
+    rg=range(cli_n$N,na.rm = T)
+    
+    
+    # selection clients pour le perimètre PLS
+    
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   sous_seg_marche=="PL" & 
+                   Regroupement.Metier  == "Professions médicales et para-médicales" & 
+                   SEG_ETUDE_TPE %in% c("Haut du Pro","Petite Entreprise"),
+                 .N,by="cd_postal_cli"]
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],
+                by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+    
+  } else {
+    
+    cli_n=bp_cli2[,.N,by=c("cd_postal_cli","seg")]
+    
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+                by.y="COPOST")
+    
+    rg=range(cli_n$N,na.rm = T)
+    
+    
+    if (tranches_ca_i=="none"){
+      cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                     SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                   .N,by="cd_postal_cli"]
+      
+      cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+      n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+      
+    } else {
+      cli_n=bp_cli[annee=="2020" & tranches_ca %in% tranches_ca_i & 
+                     id_bp==banque_i& SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                   .N,by="cd_postal_cli"]
+      
+      cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+      n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+      
+    }
+    
+    
+    
+  }
+  
+  cp_sirene_i=cp_sirene[,c("cp",tsiren),with=FALSE]
+  names(cp_sirene_i)=c("cp","n_marche")
+    
+  cli_n=merge(cli_n,cp_sirene_i,
+        by.x="cd_postal_cli",by.y="cp",all=T)%>% 
+    dplyr::mutate(nn = replace_na(N, 0))%>%
+    mutate(tp=nn/n_marche)
+  
+  # data=cli_n[lib_bp==banque_i]
+  
+    # write.xlsx(data,file=paste0("output/",
+    #                           format(Sys.time(),"%Y%m%d_%H%M"),
+    #                           "_",banque_i,"_",tsiren,"_",
+    #                 "taux_pene.xlsx"))
+    
+    
+  # cli_n[tp>1,tp:=1]
+  
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+  
+  
+  # cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  # 
+  # cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  # 
+  # comptage par département
+  cp_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  dep_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84"))) %>%
+    group_by(DEP) %>% 
+    dplyr::summarize(geometry = st_union(geometry),
+                     ndep=sum(N,na.rm = T))%>%
+    merge(dep_data,by.x="DEP",by.y="CODE_DEPT")
+  
+  # using sf
+  dep_c_sf <- st_centroid(dep_sf)
+  
+  cp_c_sf <- st_centroid(cp_sf)
+  
+  # cla
+  # data=data.table(cp_i@data)[,.(n=sum(N,na.rm=T)),by=DEP][order(n)]
+  # 
+  # 
+  
+  # directement avec base client
+  cli_n$cp=as.character(cli_n$cd_postal_cli)
+  # table(nchar(cli_n$cp))
+  cli_n[nchar(cp)==4,cp:=paste0("0",cp)]
+  cli_n$dep=substr(cli_n$cp,1,2)
+  
+  data=cli_n[lib_bp==banque_i,.(n=sum(N,na.rm = T),
+                                n_marche=sum(n_marche,na.rm = T)),
+             by=dep][order(n_marche)]%>%
+    mutate(tp=n/n_marche)
+  
+
+  # write.xlsx(data,file=paste0("output/",
+  #                             format(Sys.time(),"%Y%m%d_%H%M"),
+  #                             "_",banque_i,"_",
+  #                   "taux_pene.xlsx"))
+  
+  # déraptement
+    p=ggplot()+
+    geom_sf(data=cp_sf,aes(fill=n_marche ),
+            colour="#C3C3C3",alpha=1,size=0.1)+
+    geom_sf(data=dep_sf,alpha=0,colour="black",size=0.2)+
+    # geom_sf(data=cp_c_sf,aes(size=N),pch=1,color="blue")+
+    geom_sf_text(data=dep_c_sf,aes(label=paste0(NOM_DEPT,"(",DEP,")","\n",ndep)),size=2)+
+    geom_sf_text(data=cp_c_sf[cp_c_sf$ID %in% cli_n[is.na(lib_bp)==F,][order(-N)][1:6]$cd_postal_cli,],
+                 aes(label = paste(LIB) ), colour = "black",size=2,nudge_y = 0)+
+    theme_void()+labs(title=paste(banque_i," - Tranche CA: ",tsiren,
+                                  "\nNb siren dans région banque: ",cli_n[,.(nb=sum(n_marche,na.rm=T)),by=lib_bp][lib_bp==banque_i]$nb))+ 
+    theme(plot.title = element_text(size=6))+
+    scale_fill_continuous(low="#C2FDFF", high="#FF0000", 
+                          guide="colorbar",na.value="white",name="nombre de clients")+
+    theme(legend.position = "bottom")+
+  theme(legend.key.size = unit(.1, 'cm'), #change legend key size
+        legend.key.height = unit(.1, 'cm'), #change legend key height
+        legend.key.width = unit(.7, 'cm'), #change legend key width
+        legend.title = element_text(size=6), #change legend title font size
+        legend.text = element_text(size=4)) #change legend text font size
+  
+  p
+  return(list(p=p,d=data))
+  
+}
+
+p
+sum(data$n)
+
+```
+
+
+## pie departement
+
+
+
+```{r}
+
+banque_i="BPS"
+
+carto_banque_cli_cdep_pie=function(tranches_ca_i="> 5 M",
+                               banque_i="BPACA",
+                               SEG_ETUDE_TPE_i="Entreprise"){
+  
+  
+  if (tranches_ca_i=="none"){
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                 .N,by="cd_postal_cli"]
+  } else {
+    cli_n=bp_cli[annee=="2020" & tranches_ca %in% tranches_ca_i & 
+                   id_bp==banque_i& SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                 .N,by="cd_postal_cli"]
+  }
+  
+  cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+        by.y="COPOST",all=T)
+  
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+  
+  
+  # cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  # 
+  # cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  # 
+  # comptage par département
+  cp_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  
+  dep_sf=cp_sf%>%
+    group_by(DEP) %>% 
+    dplyr::summarize(geometry = st_union(geometry),
+                     ndep=sum(N,na.rm = T))
+  
+  # using sf
+  dep_c_sf <- st_centroid(dep_sf)
+  
+  cp_c_sf <- st_centroid(cp_sf)
+  
+
+  
+  # Make the default Pie Plot
+  p=pie(  dep_c_sf$ndep, labels = paste0("Dep:",dep_c_sf$DEP,"\nNb clients:",dep_c_sf$ndep), cex=0.6)
+  p
+  
+  
+}
+
+p
+ 
+
+```
+
+## barplot département
+
+```{r}
+
+banque_i="BPS"
+
+carto_banque_cli_cdep_bar=function(tranches_ca_i="> 5 M",
+                               banque_i="BPACA",
+                               SEG_ETUDE_TPE_i="Entreprise"){
+  
+  
+  if (tranches_ca_i=="none"){
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                 .N,by="cd_postal_cli"]
+  } else {
+    cli_n=bp_cli[annee=="2020" & tranches_ca %in% tranches_ca_i & 
+                   id_bp==banque_i& SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                 .N,by="cd_postal_cli"]
+  }
+  
+  cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+        by.y="COPOST",all=T)
+  
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+  
+  
+  # cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  # 
+  # cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  # 
+  # comptage par département
+  cp_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  
+  dep_sf=cp_sf%>%
+    group_by(DEP) %>% 
+    dplyr::summarize(geometry = st_union(geometry),
+                     ndep=sum(N,na.rm = T))
+  
+  data=data.table(dep=dep_sf$DEP,n=as.numeric(dep_sf$ndep))
+  
+  data=data.table(cp_i@data)[,.(n=sum(N,na.rm=T)),by=DEP][order(n)]
+  
+  # directement avec la base client
+    cli_n$cp=as.character(cli_n$cd_postal_cli)
+  # table(nchar(cli_n$cp))
+  cli_n[nchar(cp)==4,cp:=paste0("0",cp)]
+  cli_n$DEP=substr(cli_n$cp,1,2)
+  data=cli_n[lib_bp==banque_i,.(n=sum(N,na.rm = T)),by=DEP][order(n)]
+  
+  
+ mytheme <- mschart_theme(
+    axis_title_x = officer::fp_text(color = "white", font.size = 3, bold = T),
+    axis_title_y = officer::fp_text(),
+    grid_major_line_y = officer::fp_border(width = 0, color = "white"),
+    axis_ticks_y = officer::fp_border(width = 0, color = "white")
+  )
+  
+
+
+  chart_03 <- ms_barchart(
+    data = data, x = "DEP",
+    y = "n"
+  )
+  
+
+  chart_03 <- chart_settings(chart_03,
+                             gap_width = 150, overlap = 100, 
+                             dir = "horizontal"
+  )
+
+  # chart_03 <- chart_ax_x(chart_03,
+  #                        cross_between = "between",
+  #                        major_tick_mark = "cross", minor_tick_mark = "none")
+  # chart_03 <- chart_ax_y(chart_03,
+  #                        num_fmt = "0.00%%",
+  #                        minor_tick_mark = "none"
+  # )
+  # chart_03 <- set_theme(chart_03, mytheme)
+
+  # chart_03 <- chart_labels(x = chart_03)
+  # chart_03 <- chart_data_labels(chart_03,
+  #                               position = "ctr",
+  #                               num_fmt = "0%",
+  #                               show_val = TRUE
+  # )
+
+    chart_03 <- chart_theme(x = chart_03, title_x_rot = 270, title_y_rot = 0,legend_position ="n",
+                          # axis_ticks_y = officer::fp_border(width = 3, color = "blue"),# y ne s'affiche pas de toute façon
+                          # axis_ticks_x = officer::fp_border(width = .3, color = "green"),
+                          # axis_title_y = fp_text(color="white"),
+                          axis_title_x = officer::fp_text(color="black",font.size = 3),
+                          axis_text_x = officer::fp_text(font.size = 3),
+                          # axis_text_y = fp_text(color="white"),
+                          grid_major_line_x = officer::fp_border(width = 0,color="red"),
+                          grid_minor_line_x = officer::fp_border(width = 0,color="yellow"),
+                          grid_major_line_y = officer::fp_border(width = 0,color="red"),
+                          grid_minor_line_y = officer::fp_border(width = 0,color="green"))
+
+
+
+  chart_03 <- chart_labels_text(chart_03, officer::fp_text(color = "white", bold = TRUE, font.size = 5))
+# 
+#   chart_03[["y_axis"]][["delete"]]=T
+#   chart_03[["x_axis"]][["delete"]]=T
+#   chart_03[["label_settings"]][["show_serie_name"]] <- F
+# 
+#   chart_03[["labels"]][["x"]]=NULL
+#   chart_03[["labels"]][["y"]]=NULL
+
+
+
+  # chart_03 <- chart_data_fill(chart_03,
+  #                             values = c(cat4 = "#D3DCEA",
+  #                                        cat3 = "#ACC1EA",
+  #                                        cat2 = "#7D92AC",
+  #                                        cat1 = "#13264A") )%>%
+  #   chart_data_line_style(values = "none" )%>%
+  #   chart_data_stroke(values = "transparent")
+
+  
+  return (list(g=chart_03,d=data))
+  
+}
+
+
+
+```
+
+
+```{r}
+
+barplot_ms=function(data,x,y,group){
+  mytheme <- mschart_theme(
+    axis_title_x = fp_text(color = "white", font.size = 3, bold = T),
+    axis_title_y = fp_text(),
+    grid_major_line_y = fp_border(width = 0, color = "white"),
+    axis_ticks_y = fp_border(width = 0, color = "white")
+  )
+  
+  chart_03 <- chart_theme(x = chart_03, title_x_rot = 270, title_y_rot = 0,legend_position ="n",
+                          axis_ticks_y = fp_border(width = 3, color = "blue"),# y ne s'affiche pas de toute façon
+                          axis_ticks_x = fp_border(width = .3, color = "green"),
+                          # axis_title_y = fp_text(color="white"),
+                          axis_title_x = fp_text(color="black",font.size = 3),
+                          axis_text_x = fp_text(font.size = 3),
+                          # axis_text_y = fp_text(color="white"),
+                          grid_major_line_x = fp_border(width = 0,color="red"),
+                          grid_minor_line_x = fp_border(width = 0,color="yellow"),
+                          grid_major_line_y = fp_border(width = 0,color="red"),
+                          grid_minor_line_y = fp_border(width = 0,color="green"))
+  
+  
+  chart_03 <- ms_barchart(
+    data = data, x = x,
+    y = y, group = group
+  )
+  chart_03 <- chart_settings(chart_03,
+                             grouping = "stacked",
+                             gap_width = 150, overlap = 100
+  )
+  # chart_03 <- chart_ax_x(chart_03,
+  #                        cross_between = "between",
+  #                        major_tick_mark = "cross", minor_tick_mark = "none")
+  chart_03 <- chart_ax_y(chart_03,
+                         num_fmt = "0.00%%",
+                         minor_tick_mark = "none"
+  )
+  # chart_03 <- set_theme(chart_03, mytheme)
+  
+  # chart_03 <- chart_labels(x = chart_03)
+  chart_03 <- chart_data_labels(chart_03,
+                                position = "ctr",
+                                num_fmt = "0%",
+                                show_val = TRUE
+  )
+  chart_03 <- chart_labels_text(chart_03, fp_text(color = "white", bold = TRUE, font.size = 5))
+  
+  chart_03[["y_axis"]][["delete"]]=T
+  chart_03[["x_axis"]][["delete"]]=T
+  chart_03[["label_settings"]][["show_serie_name"]] <- F
+  
+  chart_03[["labels"]][["x"]]=NULL
+  chart_03[["labels"]][["y"]]=NULL
+  
+  
+  
+  chart_03 <- chart_data_fill(chart_03,
+                              values = c(cat4 = "#D3DCEA", 
+                                         cat3 = "#ACC1EA", 
+                                         cat2 = "#7D92AC",
+                                         cat1 = "#13264A") )%>%
+    chart_data_line_style(values = "none" )%>%
+    chart_data_stroke(values = "transparent")
+  
+  
+  return (chart_03)
+}
+
+```
+
+## Communes
+
+```{r}
+tranches_ca_i="none"
+banque_j="BPS"
+SEG_ETUDE_TPE_i="Haut du Pro"
+
+
+bp_cli[,.N,by=c("SEG_ETUDE_TPE","sous_seg_marche") ]%>%
+  spread(SEG_ETUDE_TPE,N)
+
+bp_cli[,.N,by=c("Regroupement.Metier","sous_seg_marche") ]%>%
+  spread(sous_seg_marche,N)
+
+
+bp_cli[Regroupement.Metier  == "Professions médicales et para-médicales"]
+```
+
+
+```{r}
+type ="PL"
+
+carto_banque_cli_ccom=function(type="Pas PL",tranches_ca_i="> 5 M",
+                               banque_i="BPACA",
+                               SEG_ETUDE_TPE_i="Entreprise"){
+  
+  if (type =="PL"){
+    # sélection cp PL
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   sous_seg_marche=="PL",
+                 .N,by="cd_postal_cli"]
+    
+    sum(cli_n$N)
+    
+    # calcul range
+    n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+    
+    cli_n=cli_n[is.na(cd_postal_cli)==F]
+    
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],
+                by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+    
+    rg=range(cli_n$N,na.rm = T)
+    
+  } else if (type =="PLS") {
+    
+    # range avec PL
+    
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   sous_seg_marche=="PL",
+                 .N,by="cd_postal_cli"]
+    
+    n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+    cli_n=cli_n[is.na(cd_postal_cli)==F]
+    
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],
+                by.x="cd_postal_cli",
+                by.y="COPOST")
+    
+    rg=range(cli_n$N,na.rm = T)
+    
+    
+    # selection clients pour le perimètre PLS
+    
+    cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                   sous_seg_marche=="PL" & 
+                   Regroupement.Metier  == "Professions médicales et para-médicales",
+                 .N,by="cd_postal_cli"]
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],
+                by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+    
+  } else {
+    
+    cli_n=bp_cli2[,.N,by=c("cd_postal_cli","seg")]
+    
+    cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+                by.y="COPOST")
+    
+    rg=range(cli_n$N,na.rm = T)
+    
+    
+    if (tranches_ca_i=="none"){
+      cli_n=bp_cli[annee=="2020"  & id_bp==banque_i &
+                     SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                   .N,by="cd_postal_cli"]
+      
+      cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+      n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+      
+    } else {
+      cli_n=bp_cli[annee=="2020" & tranches_ca %in% tranches_ca_i & 
+                     id_bp==banque_i& SEG_ETUDE_TPE==SEG_ETUDE_TPE_i,
+                   .N,by="cd_postal_cli"]
+      
+      cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+                by.y="COPOST",all=T)
+      n_cp_na=cli_n[is.na(cd_postal_cli)]$N
+      
+    }
+    
+    
+    
+  }
+  
+  
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+  
+  
+  # cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  # 
+  # cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  # 
+  # comptage par département
+  cp_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  dep_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84"))) %>%
+    group_by(DEP) %>% 
+    dplyr::summarize(geometry = st_union(geometry),
+                     ndep=sum(N,na.rm = T))
+  
+  # using sf
+  dep_c_sf <- st_centroid(dep_sf)
+  
+  cp_c_sf <- st_centroid(cp_sf)
+  
+  
+
+  p=ggplot()+
+    geom_sf(data=cp_sf,fill="#ECF3F7",
+            colour="#C3C3C3",size=0.05)+
+    geom_sf(data=dep_sf,alpha=0,colour="black",size=0.2)+
+    geom_sf(data=cp_c_sf,aes(size=N,alpha=0.3),color="#F07E7E",pch=19)+
+    # geom_sf(data=dep_c_sf,aes(size=ndep),pch=1,color="red")+
+    
+    theme_void()+labs(title=paste(banque_i," - Segment: ",SEG_ETUDE_TPE_i," - Tranche CA: ",tranches_ca_i,
+                                  "\nNb client dans région banque: ",cli_n[,.(nb=sum(N,na.rm=T)),by=lib_bp][lib_bp==banque_i]$nb,
+                                  "\nNb client hors région banque: ",cli_n[,.(nb=sum(N,na.rm=T)),by=lib_bp][is.na(lib_bp)]$nb,
+                                  "\nNb client sans cp: ",n_cp_na))+ 
+    scale_fill_continuous(low="#F1F1B3", high="#B425FB", 
+                          guide="colorbar",na.value="white")+
+    guides(alpha=FALSE)+ 
+    theme(plot.title = element_text(size=6))+ 
+    scale_size_continuous(name="Nb clients",limits = rg)+
+  # +facet_wrap(~DEP)
+  scale_fill_manual(values = c("blue", "white"))+
+  theme(legend.position = "bottom")
+  
+  
+  p
+  
+}
+
+p
+```
+
+
+```{r}
+p1=carto_banque_cli_ccom(tranches_ca_i="none",
+                      banque_i=banque_j,
+                      SEG_ETUDE_TPE_i="Haut du Pro")
+
+
+p2=carto_banque_cli_ccom(tranches_ca_i="1.5-3 M",
+                      banque_i=banque_j,
+                      SEG_ETUDE_TPE_i="Petite Entreprise")
+p3=carto_banque_cli_ccom(tranches_ca_i="3-5 M",
+                      banque_i=banque_j,
+                      SEG_ETUDE_TPE_i="Petite Entreprise")
+
+
+ggarrange(p1, p2, p3, ncol = 3, nrow = 1)
+
+```
+
+
+```{r}
+
+combined <- p1 + p2 & theme(legend.position = "bottom")
+combined + plot_layout(guides = "collect")
+```
+
+## Communes 3 segm
+
+
+utiliser facet, pour mieux maitriser la taille des points, mais parfois les graphiques sont trop rapprochés
+
+```{r}
+
+carto_banque_cli_ccom_3seg=function(banque_i="BPACA"){
+  
+  cli_n=bp_cli2[,.N,by=c("cd_postal_cli","seg")]
+  
+  cli_n=merge(cli_n,cp_bp[lib_bp==banque_i],by.x="cd_postal_cli",
+              by.y="COPOST",all=T)
+  
+  cli_n=as_tibble(cli_n) %>% tidyr::complete(cd_postal_cli, nesting(seg))%>%
+    data.table
+  
+  cli_n=cli_n[is.na(seg)==F]
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  # cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+  
+  
+  # cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  # 
+  # cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  # 
+  # comptage par département
+  
+  cp_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  
+  cp_sf=merge(cp_sf,cli_n,by.x="ID",by.y="cd_postal_cli")
+  
+  dep_sf=cp_sf %>%
+    group_by(DEP,seg) %>% 
+    dplyr::summarize(geometry = st_union(geometry),
+                     ndep=sum(N,na.rm = T))
+  
+  # using sf
+  dep_c_sf <- st_centroid(dep_sf)
+  
+  cp_c_sf <- st_centroid(cp_sf)
+  
+  
+  p=ggplot()+
+    geom_sf(data=cp_sf,fill="#ECF3F7",
+            colour="#C3C3C3",size=0.05)+
+    geom_sf(data=dep_sf,alpha=0,colour="black",size=0.2)+
+    geom_sf(data=cp_c_sf,aes(size=N,alpha=0.3),color="#F07E7E",pch=19)+
+    facet_wrap(~seg)+
+    # geom_sf(data=dep_c_sf,aes(size=ndep),pch=1,color="red")+
+    
+    theme_void()+
+    # labs(title=paste(banque_i," - Segment: ",SEG_ETUDE_TPE_i," - Tranche CA: ",tranches_ca_i,
+    #                               "\nNb client dans région banque: ",cli_n[,.(nb=sum(N,na.rm=T)),by=lib_bp][lib_bp==banque_i]$nb,
+    #                               "\nNb client hors région banque: ",cli_n[,.(nb=sum(N,na.rm=T)),by=lib_bp][is.na(lib_bp)]$nb))+ 
+    scale_fill_continuous(low="#F1F1B3", high="#B425FB", 
+                          guide="colorbar",na.value="white")+
+    guides(alpha=FALSE)+ theme(legend.position="bottom")
+    # theme(plot.title = element_text(size=6))+
+  # scale_fill_manual(values = c("blue", "white"))+ 
+  # theme(legend.position = "none")
+  
+  
+  p
+  
+}
+```
+
+```{r}
+cli_n[,.N,by=seg]
+
+data.table(cp_sf)[,.N,by=seg]
+
+```
+
+
+
+
+
+
+## Zoom
+
+plusieurs possibilités
+- xlim
+- xlim dans coord_sf
+
+ne fonctionnne pas dans ppt
+
+croper avant le plot
+
+
+```{r}
+
+carto_banque_cli_bps_zoom=function(tranches_ca_i="> 5 M",
+                               banque_i="BPS",
+                               SEG_ETUDE_TPE_i="Entreprise"){
+  
+  cli_n=bp_cli[annee=="2020" & tranches_ca==tranches_ca_i & id_bp==banque_i,.N,by="cd_postal_cli"]
+  
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+  
+  
+  # cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  # 
+  # cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  # 
+  # comptage par département
+  cp_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  dep_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84"))) %>%
+    group_by(DEP) %>% 
+    dplyr::summarize(geometry = st_union(geometry),
+                     ndep=sum(N,na.rm = T))
+  
+  # using sf
+  dep_c_sf <- st_centroid(dep_sf)
+  
+  cp_c_sf <- st_centroid(cp_sf)
+  
+  p=ggplot()+
+    geom_sf(data=cp_sf,aes(fill=N),
+            colour="black",alpha=0.5,size=0.1)+
+    geom_sf(data=dep_sf,alpha=0,colour="red",size=0.2)+
+    geom_sf(data=cp_c_sf,aes(size=N),pch=1,color="blue")+ 
+    geom_sf_text(data=cp_c_sf,aes(label = paste(LIB,"\n",N) ), colour = "black",size=2.6,nudge_y = -0.005)+
+    # geom_sf(data=dep_c_sf,aes(size=ndep),pch=1,color="red")+
+    
+    theme_void()+
+    labs(title=paste(banque_i," - Segment: ",SEG_ETUDE_TPE_i," - Tranche CA: ",tranches_ca_i))+
+    xlim(c(3.5,4))+ylim(c(43.5,43.7))
+    
+  # scale_fill_manual(values = c("blue", "white"))+ 
+  # theme(legend.position = "none")
+  p
+  
+
+}
+
+p
+```
+
+
+
+```{r}
+
+
+
+
+carto_banque_cli_bps_zoom=function(tranches_ca_i="> 5 M",
+                               banque_i="BPS",
+                               SEG_ETUDE_TPE_i="Entreprise"){
+  
+  cli_n=bp_cli[annee=="2020" & tranches_ca==tranches_ca_i & id_bp==banque_i,.N,by="cd_postal_cli"]
+  
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+  
+  
+  # cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  # 
+  # cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  # 
+  # comptage par département
+  cp_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  dep_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84"))) %>%
+    group_by(DEP) %>% 
+    dplyr::summarize(geometry = st_union(geometry),
+                     ndep=sum(N,na.rm = T))
+  
+  # using sf
+  dep_c_sf <- st_centroid(dep_sf)
+  
+  cp_c_sf <- st_centroid(cp_sf)
+  
+  p=ggplot()+
+    geom_sf(data=cp_sf,aes(fill=N),
+            colour="black",alpha=0.5,size=0.1)+
+    geom_sf(data=dep_sf,alpha=0,colour="red",size=0.2)+
+    geom_sf(data=cp_c_sf,aes(size=N),pch=1,color="blue")+ 
+    geom_sf_text(data=cp_c_sf,aes(label = paste(LIB,"\n",N) ), colour = "black",size=2.6,nudge_y = -0.005)+
+    # geom_sf(data=dep_c_sf,aes(size=ndep),pch=1,color="red")+
+    
+    theme_void()+
+    labs(title=paste(banque_i," - Segment: ",SEG_ETUDE_TPE_i," - Tranche CA: ",tranches_ca_i))+
+    coord_sf(xlim = c(3.5,4), ylim = c(43.5,43.7), expand = T)
+    
+  # scale_fill_manual(values = c("blue", "white"))+ 
+  # theme(legend.position = "none")
+  p
+  
+
+}
+
+p
+```
+
+
+
+taille police n'a pas la même apparent direcetement dans image png que le pptx
+
+
+```{r}
+xmin =3.8
+xmax = 4
+ymin = 43.5
+ymax = 43.68
+
+carto_banque_cli_bps_zoom=function(tranches_ca_i="> 5 M",
+                               banque_i="BPS",
+                               SEG_ETUDE_TPE_i="Entreprise",
+                               xmin =3.5, xmax = 4,
+                                    ymin = 43.5, ymax = 43.7){
+  
+  cli_n=bp_cli[annee=="2020" & tranches_ca==tranches_ca_i & id_bp==banque_i,.N,by="cd_postal_cli"]
+  
+  cp_i=subset(cp,ID %in% cp_bp[lib_bp==banque_i]$COPOST)
+  
+  cp_i=sp::merge(cp_i,cli_n,by.x="ID",by.y="cd_postal_cli")
+  
+  
+  # cp_i_df <- fortify(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")),region="ID")
+  # 
+  # cp_i_df=merge(cp_i_df,cp_i@data,by.x="id",by.y="ID")
+  # 
+  # comptage par département
+  cp_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84")))
+  # dep_sf=st_as_sf(spTransform(cp_i, CRS("+proj=longlat +datum=WGS84"))) %>%
+  #   group_by(DEP) %>% 
+  #   dplyr::summarize(geometry = st_union(geometry),
+  #                    ndep=sum(N,na.rm = T))
+  # 
+  # using sf
+  # dep_c_sf <- st_centroid(dep_sf)
+  
+  cp_c_sf <- st_centroid(cp_sf)
+  
+  
+  cp_sf <- st_crop(cp_sf, xmin =xmin, xmax = xmax,
+                                    ymin = ymin, ymax = ymax)
+  cp_c_sf <- st_crop(cp_c_sf, xmin =xmin, xmax = xmax,
+                                    ymin = ymin, ymax = ymax)
+
+  p=ggplot()+
+    geom_sf(data=cp_sf,aes(fill=N),
+            colour="black",alpha=0.5,size=0.1)+
+    # geom_sf(data=dep_sf,alpha=0,colour="red",size=0.2)+
+    geom_sf(data=cp_c_sf,aes(size=N),pch=1,color="blue")+ 
+    geom_sf_text(data=cp_c_sf,aes(label = paste(LIB,"-",ID,"\n",N) ), colour = "black",
+                 size=1.6,nudge_y = -0.005)+
+    # geom_sf(data=dep_c_sf,aes(size=ndep),pch=1,color="red")+
+    
+    theme_void()+
+    labs(title=paste(banque_i," - Segment: ",SEG_ETUDE_TPE_i," - Tranche CA: ",tranches_ca_i))+
+    scale_fill_continuous(low="thistle2", high="darkred", 
+                       guide="colorbar",na.value="white")
+    
+  # scale_fill_manual(values = c("blue", "white"))+ 
+  # theme(legend.position = "none")
+  p
+  
+
+}
+
+p
+
+
+```
+
+
+
+
+
+- départements barrres
+- par commune (noms à afficher)
+- échelle ?
+
+

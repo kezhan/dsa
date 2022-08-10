@@ -1,0 +1,38 @@
+
+# Base Adresse Nationale
+
+Téléchargement des fichiers: https://adresse.data.gouv.fr/data/ban/adresses/latest/csv/
+
+
+```{r}
+ban35=fread("../data/ban/adresses-35.csv",encoding = "UTF-8")
+ban35000=ban35[code_postal==35000,]
+
+ban35000_voie=unique(ban35000[,c("nom_voie")])
+
+
+```
+
+
+
+# Distance textuelle
+
+Cas d'usage
+
+- 
+
+
+```{r}
+ad_cor=c("ave gros malon")
+
+stringdist("malllllllland","malhon",method = 'soundex')
+
+stringdist("malllllllland","malhon",method = 'lv')
+
+stringdist("malllllllland","malhon",method = 'jw')
+
+```
+
+
+
+# Adresses à corriger

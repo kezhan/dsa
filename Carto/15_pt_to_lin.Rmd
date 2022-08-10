@@ -1,0 +1,120 @@
+
+
+## Tronçons de voies
+
+https://opendata.apur.org/datasets/Apur::troncon-voie
+https://opendata.paris.fr/explore/dataset/troncon_voie/information/
+https://www.data.gouv.fr/fr/datasets/denominations-des-emprises-des-voies-actuelles/
+https://parisdata.opendatasoft.com/explore/dataset/denominations-emprises-voies-actuelles/information/
+
+```{r}
+voies=readOGR("../data/shapefiles/TRONCON_VOIE/TRONCON_VOIE.shp")
+
+names(voies)
+
+voies_ech=subset(voies,objectid%in% c("13","77264"))
+
+voies_ech =  spTransform(voies_ech,"+proj=longlat +datum=WGS84")
+
+# pour Paris
+voies_75=subset(voies,c_coinsee=="75056")
+voies_75 =  spTransform(voies_75,"+proj=longlat +datum=WGS84")
+head(voies_75)
+
+```
+
+
+```{r}
+sort(table(voies_75[["c_coinsee"]]))
+sum(table(voies_75[["c_coinsee"]]))
+```
+
+```{r}
+names(voies_75)
+
+voies_75_data=data.table(voies_75@data)
+voies_75_data[,.N,by=c("c_coinsee","n_sq_vo","n_sq_co","n_sq_tv")]
+voies_75_data[,.N,by=c("c_coinsee","n_sq_vo","n_sq_co")]
+voies_75_data[,.N,by=c("c_coinsee","n_sq_co")]
+```
+
+### Affectations voies aux adresses
+
+calculer le tronçon de voie le plus proche
+
+https://stackoverflow.com/questions/47675571/r-spatial-join-between-spatialpoints-gps-coordinates-and-spatiallinesdatafra
+https://gis.stackexchange.com/questions/269746/find-nearest-line-segment-to-each-point-in-r
+https://stackoverflow.com/questions/55752064/finding-closest-coordinates-between-two-large-data-sets
+
+
+```{r}
+Encoding(siret_paris_iris$geo_adresse)<- "UTF-8"
+```
+
+
+```{r}
+siret_paris17_iris=siret_paris_iris[code_iris=="751176606" & substr(categorieJuridiqueUniteLegale,1,1)=="5"]
+
+siret_paris_iris_sp_ech <- spTransform(SpatialPoints(siret_paris17_iris[1:100,c("longitude","latitude")],
+                                                     proj4string=CRS("+proj=longlat +datum=WGS84")),
+                     "+proj=longlat +datum=WGS84")
+
+
+```
+
+```{r}
+
+
+gd <- gDistance(voies_75,siret_paris_iris_sp_ech,byid=TRUE)
+a <- apply(gd, 1, which.min)
+
+siret_paris_iris_sp_ech$id_voies=a
+
+```
+
+
+```{r}
+siret_paris_iris_sp_ech$objectid=voies_75$objectid[siret_paris_iris_sp_ech$id_voies]
+
+voies_ech=voies_75[voies_75$objectid %in% siret_paris_iris_sp_ech$objectid,]
+
+voies_ech =  spTransform(voies_ech,"+proj=longlat +datum=WGS84")
+
+
+```
+
+
+
+fusion avec voies
+
+```{r}
+
+# stat par catégorie, pour compter le voies par tronçons de voies
+
+siret_paris_iris_sp_ech_voies=data.table(siret_paris_iris_sp_ech@data)[,.N,by=objectid]
+
+voies_ech_stat=sp::merge(voies_ech,
+                        siret_paris_iris_sp_ech_voies,
+                        by.x="objectid",by.y="objectid")
+
+names(voies_ech_stat)
+
+```
+
+carto test
+
+```{r}
+
+pal_num <- colorNumeric(c("blue","yellow","red"), NULL, n = 20)
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=voies_ech_stat,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color=~pal_num(N/shape_Leng))%>%
+  addCircles(data=siret_paris_iris_sp_ech,radius = 1)
+
+```
+
+
+
+
+
+

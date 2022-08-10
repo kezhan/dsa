@@ -1,0 +1,225 @@
+
+
+# Données
+
+## Tronçons de voies
+
+https://opendata.apur.org/datasets/Apur::troncon-voie
+https://opendata.paris.fr/explore/dataset/troncon_voie/information/
+https://www.data.gouv.fr/fr/datasets/denominations-des-emprises-des-voies-actuelles/
+https://parisdata.opendatasoft.com/explore/dataset/denominations-emprises-voies-actuelles/information/
+
+
+```{r}
+
+voies=readOGR("../data/shapefiles/TRONCON_VOIE/TRONCON_VOIE.shp")
+
+names(voies)
+voies_ech=subset(voies,objectid%in% c("13","77264"))
+voies_ech =  spTransform(voies_ech,"+proj=longlat +datum=WGS84")
+# pour Paris
+
+voies_75=subset(voies,c_coinsee=="75056")
+voies_75 =  spTransform(voies_75,"+proj=longlat +datum=WGS84")
+head(voies_75)
+
+```
+
+
+```{r}
+sort(table(voies_75[["c_coinsee"]]))
+sum(table(voies_75[["c_coinsee"]]))
+```
+
+```{r}
+names(voies_75)
+
+voies_75_data=data.table(voies_75@data)
+voies_75_data[,.N,by=c("c_coinsee","n_sq_vo","n_sq_co","n_sq_tv")]
+voies_75_data[,.N,by=c("c_coinsee","n_sq_vo","n_sq_co")]
+voies_75_data[,.N,by=c("c_coinsee","n_sq_co")]
+```
+
+carto test
+
+```{r}
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=voies_ech,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=voies_75,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")
+
+```
+
+```{r}
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=subset(voies_75,objectid %in% siret_paris_iris_cj2_92[1:10]$id_voies),opacity = 1,
+               fillOpacity = 0.5,weight = 20,fillColor = "grey",color="black")%>%
+  addCircles(data=siret_paris_iris_cj2_92[1:10],radius = 1)
+
+```
+
+```{r}
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=voies_75_asso,opacity = 1,fillOpacity = 0.5,
+               weight = 2,fillColor = "grey",color="black")
+
+```
+
+## linéaire commercial
+
+
+```{r}
+
+bdcom=readOGR("../data/shapefiles/BDCOM_2020/BDCOM_2020.shp")
+lincom=readOGR("../data/shapefiles/LINEAIRE_COMMERCIAL/LINEAIRE_COMMERCIAL.shp")
+
+bdcom=spTransform(bdcom, CRS("+proj=longlat +datum=WGS84"))
+lincom=spTransform(lincom, CRS("+proj=longlat +datum=WGS84"))
+
+```
+
+en cours
+
+```{r}
+
+
+lincom_sf=st_as_sf(lincom,crs=st_crs(iris_75_df))
+
+nrow(lincom_sf)
+
+lincom_sf[20:900,]
+
+lincom_dt=lincom_sf %>% dplyr::mutate(
+  intersection = as.integer(sapply(st_intersects(geometry,iris_75_df), "[", 1)),
+  code_iris = if_else(is.na(intersection), "", as.character(iris_75_df$C_IR[intersection]))
+)%>%data.table()
+
+
+lenlncomiris=lincom_dt[,.(nlincom=.N,
+                          sumlenlincom=sum(Shape_Leng)),
+          by="code_iris"]
+
+nrow(lincom_sf)
+
+```
+
+pour explorer les polylines qui sont sur plusieurs codes iris
+
+```{r}
+
+
+inter_test=st_intersects(lincom_sf$geometry,iris_75_df)
+inter_test[]
+
+
+table(lengths(inter_test))
+
+sapply(inter_test, "[", 1)[6790]
+
+data.table(id=1:nrow(lincom_sf),
+           lengiris=lengths(inter_test))[lengiris==2]
+
+```
+
+## Lignes métro
+
+```{r}
+
+# lignes transports en commun
+
+lignes_metro=readOGR("../data/shapefiles/france_subway_routes_line/france_subway_routes_lineLine.shp")
+plot(lignes_metro)
+names(lignes_metro)
+lignes_metro=spTransform(lignes_metro, CRS("+proj=longlat +datum=WGS84"))
+
+lignes_metro_data=data.table(lignes_metro@data)
+
+lignes_metro_75=subset(lignes_metro,
+                            operator == "RATP")
+
+
+lignes_metro_data[,.N,by=operator]
+plot(lignes_metro_75)
+
+# lignes transports en commun apur
+
+lignes_transp=readOGR("../data/shapefiles/LIGNE_DE_TRANSPORT_EN_COMMUN/LIGNE_DE_TRANSPORT_EN_COMMUN.shp")
+
+plot(lignes_transp)
+names(lignes_transp)
+
+lignes_transp=spTransform(lignes_transp, CRS("+proj=longlat +datum=WGS84"))
+
+lignes_transp_data=data.table(lignes_transp@data)
+
+# réseaux
+
+# https://www.data.gouv.fr/fr/datasets/traces-du-reseau-de-transport-ferre-dile-de-france/#community-resources
+
+reseau_ferre=readOGR("../data/shapefiles/traces-du-reseau-ferre-idf/traces-du-reseau-ferre-idf.shp")
+
+plot(reseau_ferre)
+names(reseau_ferre)
+
+reseau_ferre=spTransform(reseau_ferre, CRS("+proj=longlat +datum=WGS84"))
+
+reseau_ferre_data=data.table(reseau_ferre@data)
+
+
+```
+
+
+```{r}
+
+leaflet() %>% 
+  addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=touri,opacity = 1,
+              fillOpacity = 0.5,weight = 2,
+              fillColor = "grey",color="black",
+              group="Zones touristiques")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = 0.1)%>%
+    addPolylines(data=lignes_metro_75,color = ~colour,weight =2,opacity = 1,
+               group="Lignes métro")%>%
+  addCircles(data=subset(tr_75_trafic,mode.y=="Metro"),
+             radius = ~Trafic/40000,popup=~nom,weight = 2,
+             group="Trafic Métro")%>%
+  addCircles(data=subset(tr_75_trafic,mode.y=="RER"),
+             radius = ~Trafic/40000,popup=~nom,
+             color="red",group="Trafic RER")%>%
+  # Layers control
+  addLayersControl(
+    overlayGroups = c("Code postal","Code IRIS","Lignes métro","Stations métro",
+                      "Trafic Métro",
+                      "Trafic RER",
+                      "Zones touristiques"),
+    options = layersControlOptions(collapsed = FALSE))
+
+
+
+
+```
+
+
+# tests shpfile
+
+
+```{r}
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=rdita,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")
+
+```
+
+
+
+```{r}
+rdita
+```
+

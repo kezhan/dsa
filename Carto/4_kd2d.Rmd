@@ -1,0 +1,341 @@
+---
+title: "Densités"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    navbar:
+      - { title: "Accueil", href: "index.html", align: right}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+# Restaurants
+
+## Row {.tabset}
+
+### Adresses concentration
+
+```{r}
+              
+siret_paris_resto_conc=siret_paris_iris_voies[activitePrincipaleUniteLegale %in% c("5610A","5610C"),.N,
+                                               by=c("geo_adresse","longitude","latitude")][order(-N)][N>10]
+
+siret_paris_resto_conc%>%
+  datatable(rownames = F)
+
+```
+
+
+### Densité resto
+
+```{r}
+# siret_paris_iris: les données viennent de 1_base...
+# siret_paris, c'est filtré avec sirene et siret paris
+# iris avec affectation avec les contours iris
+
+bw=c(.002, .003)
+gs=c(3000,3000)
+
+## MAKE CONTOUR LINES
+## Note, bandwidth choice is based on MASS::bandwidth.nrd()
+kde <- KernSmooth::bkde2D(siret_paris_iris_voies[activitePrincipaleUniteLegale %in% c("5610A","5610C"),
+                                                 list(longitude, latitude)],
+                          bandwidth=bw, gridsize = gs)
+
+CL <- contourLines(kde$x1 , kde$x2 , kde$fhat,nlevels =20)
+
+# niveaux
+LEVS <- as.factor(sapply(CL, `[[`, "level"))
+
+NLEV <- length(levels(LEVS))
+
+## CONVERT CONTOUR LINES TO POLYGONS
+pgons <- lapply(1:length(CL), function(i)
+  Polygons(list(Polygon(cbind(CL[[i]]$x, CL[[i]]$y))), ID=i))
+spgons = SpatialPolygons(pgons)
+
+## Leaflet map with polygons
+leaflet(spgons)%>% addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(color = rev(heat.colors(NLEV, NULL)[LEVS]))%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addCircles(data=siret_paris_resto_conc,color="black",weight = 1,
+             radius=~N,
+             popup = ~paste(geo_adresse,
+                            "<br>Nombre d'établissements: ",N))
+  
+```
+
+
+# Associations
+
+## Row {.tabset}
+
+### Infos
+
+- Nature des établissements: catégorie juridique 92
+- Possibilité de filtrer sur les codes NAF
+- Certaines adresses peuvent contenir un grand nombre d'associations. On peut les retraiter pour avoir des densités plus cohérentes.
+
+
+### Adresses concentration
+
+```{r}
+siret_paris_cj2_92_conc=siret_paris_iris_voies[cj2=="92",.N,
+                                               by=c("geo_adresse","longitude","latitude")][order(-N)][N>10]
+
+
+siret_paris_cj2_92_conc%>%
+  datatable(rownames = F)
+```
+
+
+### Densité associations
+
+```{r,eval=FALSE}
+
+siret_paris_iris[cj2=="92",.N,by=geo_adresse][order(-N)]
+siret_paris_iris[cj2=="92",.N,by=c("trancheEffectifsEtablissement")][order(-N)]
+
+siret_paris_iris[cj2=="92",.N,by=c("geo_adresse","trancheEffectifsEtablissement")][order(-N)]
+
+siret_paris_iris[cj2=="92" & trancheEffectifsEtablissement=="42"]
+
+```
+
+```{r}
+colfunc<-colorRampPalette(c("red","yellow","springgreen","royalblue","grey"))
+
+```
+
+```{r}
+# siret_paris_iris: les données viennent de 1_base...
+# siret_paris, c'est filtré avec sirene et siret paris
+# iris avec affectation avec les contours iris
+
+bw=c(.002, .003)
+gs=c(2000,2000)
+
+## MAKE CONTOUR LINES
+## Note, bandwidth choice is based on MASS::bandwidth.nrd()
+
+kde <- KernSmooth::bkde2D((siret_paris_iris_voies[cj2=="92", list(longitude, latitude)]),
+                          bandwidth=bw, gridsize = gs)
+
+CL <- contourLines(kde$x1 , kde$x2 , kde$fhat,nlevels=20)
+
+## EXTRACT CONTOUR LINE LEVELS
+LEVS <- as.factor(sapply(CL, `[[`, "level"))
+
+NLEV <- length(levels(LEVS))
+
+## CONVERT CONTOUR LINES TO POLYGONS
+pgons <- lapply(1:length(CL), function(i)
+  Polygons(list(Polygon(cbind(CL[[i]]$x, CL[[i]]$y))), ID=i))
+spgons_asso = SpatialPolygons(pgons)
+
+## Leaflet map with polygons
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(data=spgons_asso,
+              color = rev(colfunc(NLEV)[LEVS])) %>%
+  addPolygons(data=cp_75,opacity = 1,
+              fillOpacity = 0,weight = 1.2,
+              color="black",group="Code postal")%>%
+  addCircles(data=siret_paris_cj2_92_conc,color="black",weight = 1,
+             radius=~N,
+             popup = ~paste(geo_adresse,
+                           "<br>Nombre d'établissements: ",N),
+             group="Adresses avec forte concentration")%>%
+    addPolygons(data=iris_75,opacity = 1,
+                fillOpacity = 0,weight = 0.8,
+                popup = ~paste(CODE_IRIS,NOM_IRIS),
+                group="Code IRIS")%>%
+  # Layers control
+  addLayersControl(
+    overlayGroups = c("Code postal","Code IRIS","Adresses avec forte concentration"),
+    options = layersControlOptions(collapsed = FALSE))
+
+```
+
+
+
+### Densité associations adresses uniques
+
+```{r,eval=FALSE}
+
+siret_paris_iris[cj2=="92",.N,by=geo_adresse][order(-N)]
+siret_paris_iris[cj2=="92",.N,by=c("trancheEffectifsEtablissement")][order(-N)]
+
+siret_paris_iris[cj2=="92",.N,by=c("geo_adresse","trancheEffectifsEtablissement")][order(-N)]
+
+siret_paris_iris[cj2=="92" & trancheEffectifsEtablissement=="42"]
+
+```
+
+```{r}
+# siret_paris_iris: les données viennent de 1_base...
+# siret_paris, c'est filtré avec sirene et siret paris
+# iris avec affectation avec les contours iris
+
+bw=c(.002, .003)
+gs=c(2000,2000)
+
+## MAKE CONTOUR LINES
+## Note, bandwidth choice is based on MASS::bandwidth.nrd()
+
+kde <- KernSmooth::bkde2D(unique(siret_paris_iris_voies[cj2=="92", list(longitude, latitude)]),
+                          bandwidth=bw, gridsize = gs)
+
+CL <- contourLines(kde$x1 , kde$x2 , kde$fhat,nlevels=10)
+
+## EXTRACT CONTOUR LINE LEVELS
+LEVS <- as.factor(sapply(CL, `[[`, "level"))
+
+NLEV <- length(levels(LEVS))
+
+## CONVERT CONTOUR LINES TO POLYGONS
+pgons <- lapply(1:length(CL), function(i)
+  Polygons(list(Polygon(cbind(CL[[i]]$x, CL[[i]]$y))), ID=i))
+
+spgons_asso = SpatialPolygons(pgons)
+
+```
+
+```{r,eval=FALSE}
+# analyse des couleurs
+# trop court
+brewer.pal(n = NLEV, name = "RdYlBu")
+
+# personalisable
+
+# https://stackoverflow.com/questions/13353213/gradient-of-n-colors-ranging-from-color-1-and-color-2
+
+plot(rep(1,NLEV),col=rev(colfunc(NLEV)), pch=19,cex=2)
+
+
+```
+
+```{r}
+
+## Leaflet map with polygons
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(data=spgons_asso,
+              color = rev(colfunc(NLEV)[LEVS]),
+              group="Contours densité asso") %>%
+    addPolygons(data=touri,opacity = 1,
+              fillOpacity = 0.8,weight = 2,
+              fillColor = "#C800F4",color="#C800F4",
+              group="Zones touristiques")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 1.2,
+              color="black",group="Code postal")%>%
+  addCircles(data=siret_paris_cj2_92_conc,color="black",weight = 1,
+             radius=~N,
+             popup = ~paste(geo_adresse,
+                            "<br>Nombre d'établissements: ",N),
+             group="Adresses avec forte concentration")%>%
+  addPolygons(data=iris_75,opacity = 1,
+              fillOpacity = 0,weight = 0.4,
+              popup = ~paste(CODE_IRIS,NOM_IRIS),
+              group="Code IRIS")%>%
+
+  addPolylines(data=lincom,opacity = 1,fillOpacity = 0.5,weight = 2,
+               fillColor = "grey",
+               color="black",
+               group="Linéaires commerciaux")  %>%
+    addPolylines(data=lignes_metro_75,color = ~colour,weight =2,opacity = 1,
+               group="Lignes métro")%>%
+  addLabelOnlyMarkers(
+    data=tr_75,label = ~nom,
+    labelOptions = labelOptions(noHide = T, direction = 'top',
+                                textOnly = FALSE,
+                                textsize = "10px"),
+    group="Stations métro"
+  )%>%
+  # Layers control
+  addLayersControl(
+    overlayGroups = c("Contours densité asso",
+                      "Code postal","Code IRIS",
+                      "Adresses avec forte concentration",
+                      "Linéaires commerciaux",
+                      "Lignes métro","Stations métro",
+                      "Zones touristiques"),
+    options = layersControlOptions(collapsed = FALSE))%>%
+  leaflet::addLegend(position="bottomright",
+                     colors=rev(colfunc(NLEV)),labels=levels(LEVS))
+
+```
+
+
+
+
+# PME
+
+## Row {.tabset}
+
+### Adresses concentration
+
+```{r}
+siret_paris_compme_conc=siret_paris_iris_voies[cj1=="5" & categorieEntreprise=="PME",.N,
+                                               by=c("geo_adresse","longitude","latitude")][order(-N)][N>10]
+
+
+siret_paris_compme_conc%>%
+  datatable(rownames = F)
+```
+
+### PME
+
+```{r}
+# siret_paris_iris: les données viennent de 1_base...
+# siret_paris, c'est filtré avec sirene et siret paris
+# iris avec affectation avec les contours iris
+
+bw=c(.002, .003)
+gs=c(2000,2000)
+
+## MAKE CONTOUR LINES
+## Note, bandwidth choice is based on MASS::bandwidth.nrd()
+
+kde <- KernSmooth::bkde2D((siret_paris_iris_voies[cj1=="5" & categorieEntreprise=="PME", 
+                                                  list(longitude, latitude)]),
+                          bandwidth=bw, gridsize = gs)
+
+CL <- contourLines(kde$x1 , kde$x2 , kde$fhat,nlevels=20)
+
+## EXTRACT CONTOUR LINE LEVELS
+LEVS <- as.factor(sapply(CL, `[[`, "level"))
+
+NLEV <- length(levels(LEVS))
+
+## CONVERT CONTOUR LINES TO POLYGONS
+pgons <- lapply(1:length(CL), function(i)
+  Polygons(list(Polygon(cbind(CL[[i]]$x, CL[[i]]$y))), ID=i))
+spgons_pme = SpatialPolygons(pgons)
+
+## Leaflet map with polygons
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(data=spgons_pme,
+              color = rev(heat.colors(NLEV, NULL)[LEVS]))%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 0.8)%>%
+  addCircles(data=siret_paris_compme_conc,color="black",weight = 1,
+             radius=~N/10,
+             popup = ~paste(geo_adresse,
+                           "<br>Nombre d'établissements: ",N))
+
+
+```
+
+
+# Informations
+
+## Row {.tabset}
+
+### sources des données
+
+- Sirene: https://www.sirene.fr/
+- Contours IRIS: https://www.insee.fr/fr/information/2017372
+- Population et CSP: https://www.insee.fr/fr/statistiques/4799309
+
+

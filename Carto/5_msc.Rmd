@@ -1,0 +1,192 @@
+---
+title: "MAIF Social Club"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    navbar:
+      - { title: "Accueil", href: "index.html", align: right }
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+# Données
+
+## Row {.tabset}
+
+### Par IRIS
+
+```{r}
+
+data_msc=merge(diplo_75[,c("IRIS","LIBIRIS","TYP_IRIS","P17_NSCOL15P_SUP5","ratio")],
+      csp_75[,c("IRIS","C17_POP15P_CS3","P17_POP")],by="IRIS")%>%
+  merge(fildisp_75[,c("IRIS","DISP_MED18")],by="IRIS")%>%
+  merge(siret_paris_iris_voies[cj2=="92",.(nb_asso=.N,nb_asso_unique=length(unique(geo_adresse))),
+                               by=area],
+        by.x="IRIS",by.y="area")%>%
+  merge(siret_paris_iris_voies[cj1=="5" & categorieEntreprise =="PME" ,.(nb_pme=.N),by=area],by.x="IRIS",by.y="area")%>%
+  merge(lenlncomiris,by.x="IRIS",by.y="code_iris")%>%
+  merge(iris_data[,c("SHAPE_Area","M2_POP","C_IR")],by.x="IRIS",by.y="C_IR")%>%
+  mutate(lincomden=sumlenlincom/M2_POP*10000)%>%
+  select(-c(sumlenlincom,nlincom))%>%
+  mutate(dSUP5=P17_NSCOL15P_SUP5/M2_POP*100000)%>%
+  mutate(dcs3=C17_POP15P_CS3/M2_POP*100000)%>%
+  mutate(dasso=nb_asso/M2_POP*100000)%>%
+  mutate(dpop=P17_POP/M2_POP*100000)%>%
+  select(-c(P17_NSCOL15P_SUP5,nb_asso,nb_asso_unique,P17_POP,M2_POP))
+
+
+datatable(data_msc,rownames = F,filter = "top")%>%
+  formatCurrency(c("C17_POP15P_CS3","nb_pme"),mark = " ",digits = 0,currency = "")%>%
+  formatCurrency(c("SHAPE_Area","lincomden","dSUP5","dcs3","dasso","dpop"),digits = 0,currency = "",mark=" ")%>%
+  formatStyle("C17_POP15P_CS3",
+  background = styleColorBar(range(data_msc$C17_POP15P_CS3), 'lightblue'),
+  backgroundSize = '98% 88%',
+  backgroundRepeat = 'no-repeat',
+  backgroundPosition = 'center')%>%
+  formatStyle("nb_pme",
+  background = styleColorBar(range(data_msc$nb_pme), 'lightblue'),
+  backgroundSize = '98% 88%',
+  backgroundRepeat = 'no-repeat',
+  backgroundPosition = 'center')%>% formatStyle("DISP_MED18",
+  background = styleColorBar(range(data_msc$DISP_MED18), 'lightblue'),
+  backgroundSize = '98% 88%',
+  backgroundRepeat = 'no-repeat',
+  backgroundPosition = 'center')%>% formatStyle("ratio",
+  background = styleColorBar(range(data_msc$ratio), 'pink'),
+  backgroundSize = '98% 88%',
+  backgroundRepeat = 'no-repeat',
+  backgroundPosition = 'center')%>%
+  formatPercentage("ratio")%>%
+  formatStyle("lincomden",
+  background = styleColorBar(range(data_msc$lincomden), 'pink'),
+  backgroundSize = '98% 88%',
+  backgroundRepeat = 'no-repeat',
+  backgroundPosition = 'center')%>%
+  
+  formatStyle("dSUP5",
+  background = styleColorBar(range(data_msc$dSUP5), 'pink'),
+  backgroundSize = '98% 88%',
+  backgroundRepeat = 'no-repeat',
+  backgroundPosition = 'center')%>%
+  formatStyle("dcs3",
+  background = styleColorBar(range(data_msc$dcs3), 'pink'),
+  backgroundSize = '98% 88%',
+  backgroundRepeat = 'no-repeat',
+  backgroundPosition = 'center')%>%
+  formatStyle("dasso",
+  background = styleColorBar(range(data_msc$dasso), 'pink'),
+  backgroundSize = '98% 88%',
+  backgroundRepeat = 'no-repeat',
+  backgroundPosition = 'center')%>%
+  formatStyle("dpop",
+  background = styleColorBar(range(data_msc$dpop), 'pink'),
+  backgroundSize = '98% 88%',
+  backgroundRepeat = 'no-repeat',
+  backgroundPosition = 'center')
+  
+```
+
+
+### Voies
+
+
+
+
+# Carto
+
+## Row {.tabset}
+
+### Associations +
+
+```{r,eval=FALSE}
+names(iris_75)
+names(touri)
+```
+
+
+```{r}
+# siret_paris_iris: les données viennent de 1_base...
+# siret_paris, c'est filtré avec sirene et siret paris
+# iris avec affectation avec les contours iris
+
+bw=c(.002, .003)
+gs=c(2000,2000)
+
+## MAKE CONTOUR LINES
+## Note, bandwidth choice is based on MASS::bandwidth.nrd()
+
+kde <- KernSmooth::bkde2D(unique(siret_paris_iris_voies[cj2=="92", list(longitude, latitude)]),
+                          bandwidth=bw, gridsize = gs)
+
+CL <- contourLines(kde$x1 , kde$x2 , kde$fhat,nlevels=20)
+
+## EXTRACT CONTOUR LINE LEVELS
+LEVS <- as.factor(sapply(CL, `[[`, "level"))
+
+NLEV <- length(levels(LEVS))
+
+## CONVERT CONTOUR LINES TO POLYGONS
+pgons <- lapply(1:length(CL), function(i)
+  Polygons(list(Polygon(cbind(CL[[i]]$x, CL[[i]]$y))), ID=i))
+spgons_asso = SpatialPolygons(pgons)
+
+```
+
+
+```{r}
+
+pal_csp <- colorQuantile(c("blue","yellow","red"), NULL, n = 20)
+pal_asso_quant <- colorQuantile(c("blue","yellow","red"), NULL, n = 20)
+
+## Leaflet map with polygons
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(data=spgons_asso,color = rev(heat.colors(NLEV, NULL)[LEVS]),group="Densité asso")%>%
+  addPolygons(data=touri,opacity = 1,fillOpacity = 0.5,weight = 1,
+              fillColor = "grey",color="black",group="Quartiers touristiques",
+              popup=~name)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = .5,group="iris",
+              popup = ~paste(CODE_IRIS,NOM_IRIS))%>%
+  addCircles(data=tr_75,radius = 1,popup = ~nom,group="transport") %>%
+  addPolygons(data=iris_75_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_csp(C16_POP15P_CS3),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",C16_POP15P_CS3),group="csp")%>%
+  addPolygons(data=iris_75_asso,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_asso(N),
+              popup=~paste(CODE_IRIS," - ",NOM_IRIS,
+                           "<br>Nombre total: ",N,
+                                    "<br>Nombre par adresse unique: ",adunique),
+              group="iris_asso")%>%
+  addPolygons(data=iris_75_asso,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_asso_quant(N),
+              popup=~paste(CODE_IRIS," - ",NOM_IRIS,
+                           "<br>Nombre total: ",N,
+                                    "<br>Nombre par adresse unique: ",adunique),
+              group="iris_asso_quantiles")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 1.5)%>%
+  leaflet::addLegend(data=iris_75_asso,position="bottomright",pal=pal_asso,values=~N)%>%
+  addCircles(data=siret_paris_cj2_92_conc,color="black",weight = 1,
+             radius=~N,
+             popup = ~paste(geo_adresse,
+                           "<br>Nombre d'établissements: ",N),group="adresses asso")%>%
+  # Layers control
+  addLayersControl(
+    overlayGroups = c("Densité asso","adresses asso", "transport","iris",
+                      "Quartiers touristiques","csp","iris_asso","iris_asso_quantiles"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+```
+
+
+
+
+### PME +
+
+
+### CSP +
+
+
+

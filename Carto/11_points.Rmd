@@ -1,0 +1,152 @@
+
+
+
+
+# Visualisation des adresses ponctuelles
+
+https://adresse.data.gouv.fr/data/ban/adresses/latest/csv/
+
+```{r}
+ban_75=fread("../data/ban/adresses-75.csv")
+```
+
+
+```{r}
+ggplot(ban_75,aes(lon,lat))+geom_point()+coord_map()+theme_void()
+
+ban_75_ech=ban_75[sample(nrow(ban_75),nrow(ban_75)*0.02),]
+
+ggplot(ban_75_ech,aes(lon,lat))+
+  geom_point()+
+  coord_map()+
+  theme_void()
+
+
+```
+
+
+## Couleurs des points
+
+```{r}
+ggplot(ban_75_ech,aes(lon,lat,color=as.factor(code_postal)))+
+  geom_point()+
+  coord_map()+
+  theme_void()
+
+```
+
+
+# Carte interactive
+
+```{r}
+leaflet() %>% addTiles()%>%
+  addCircles(data=ban_75_ech,lng = ~lon, lat = ~lat)
+```
+
+```{r}
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addCircles(data=ban_75_ech,lng = ~lon, lat = ~lat)
+
+```
+
+```{r}
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addCircles(data=ban_75_ech)
+
+```
+
+
+
+
+## Avec couleurs
+
+```{r}
+
+factpal <- colorFactor(topo.colors(20), ban_75_ech$code_postal)
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addCircles(data=ban_75_ech,color=~factpal(code_postal))
+
+```
+
+
+
+# Centres communes
+
+```{r}
+codes_insee_postal
+```
+
+```{r}
+codes_insee_postal=fread(paste0("../data/correspondance-code-insee-code-postal.csv"),sep=";")
+names(codes_insee_postal)=gsub("é","e",gsub(" ","_",names(codes_insee_postal)))
+
+codes_insee_postal_75=codes_insee_postal[substr(Code_INSEE,1,2)=="75"]
+
+codes_insee_postal_75=codes_insee_postal_75%>%
+  separate(geo_point_2d,c("lat","lon"),sep=",")
+codes_insee_postal_75$lat=as.numeric(codes_insee_postal_75$lat)
+codes_insee_postal_75$lon=as.numeric(codes_insee_postal_75$lon)
+
+```
+
+
+```{r}
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addCircles(data=codes_insee_postal_75,
+             radius=~Population*5,
+             lng = ~lon, lat = ~lat,
+             popup = ~paste0(Commune,"<br>",
+                             "Population: ",
+                             round(Population,0)," k"))
+
+
+```
+
+
+
+# Stations transports en commun
+
+```{r}
+
+# transports en commun
+
+tr=readOGR("../data/shapefiles/emplacement-des-gares-idf/emplacement-des-gares-idf.shp",
+            layer="emplacement-des-gares-idf")
+
+names(tr)
+
+tr_75=subset(tr,gares_id %in% unique(over(iris_75,tr)$gares_id))
+
+tr_data=data.table(tr@data)
+
+
+Encoding(tr_data$nom) <- "UTF-8"
+Encoding(tr_data$mode) <- "UTF-8"
+tr_data[,.N,by=mode]
+
+tr_data[mode=="Métro",]
+
+```
+
+```{r}
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addCircles(data=tr,radius = 1)
+
+```
+
+
+
+```{r}
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addMarkers(data=tr,
+             clusterOptions = markerClusterOptions())
+
+
+```
+

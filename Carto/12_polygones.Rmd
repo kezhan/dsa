@@ -1,0 +1,576 @@
+
+
+# Contours
+
+Une carte choroplèthe (du grec χώρος : « zone/région » et πληθαίν : « multiple ») est une carte thématique où les régions sont colorées ou remplies d'un motif qui montre une mesure statistique, tels la densité de population ou le revenu par habitant. Ce type de carte facilite la comparaison d'une mesure statistique d'une région à l'autre ou montre la variabilité de celle-ci pour une région donnée. ([Wikipédia](https://fr.wikipedia.org/wiki/Carte_choropl%C3%A8the))
+
+Pour de créer des cartes choroplèthes, nous avons d'abord besoin des fonds de carte (ou des contours). Nous devons les télécharger sur des sites qui en proposent. On peut avoir les différents contours suivants:
+
+- Départements
+- Codes postaux
+- Communes
+- Codes iris
+
+La précision des contours dépend souvent des données qu'on a. On devra faire des fusions de données.
+
+On doit rechercher des fichiers de fonds de carte sur internet.
+
+
+## Départements
+
+```{r,eval=FALSE}
+dep=readOGR("../data/shapefiles/DEPARTEMENT/DEPARTEMENT.shp",
+            layer="DEPARTEMENT")
+
+names(dep)
+
+plot(dep)
+
+dep_data=dep@data%>%
+  data.table()
+
+```
+
+## Codes postaux
+
+
+Source: [Fond de carte des codes postaux](https://www.data.gouv.fr/fr/datasets/fond-de-carte-des-codes-postaux/)
+
+
+```{r,eval=FALSE}
+# Codes postaux
+
+cp=readOGR("../data/shapefiles/codes_postaux/codes_postaux_region.shp",
+            layer="codes_postaux_region")
+names(cp)
+
+cp=spTransform(cp, CRS("+proj=longlat +datum=WGS84"))
+
+cp_75=subset(cp,DEP=="75")
+
+# cp[cp$DEP=="75"]
+
+plot(cp_75)
+
+```
+
+
+## Codes postaux la poste
+
+https://www.data.gouv.fr/fr/datasets/base-officielle-des-codes-postaux/
+
+```{r,eval=FALSE}
+# Codes postaux
+
+cpp=readOGR("../data/shapefiles/laposte_hexasmal/laposte_hexasmal.shp")
+names(cpp)
+
+dim(cpp)
+
+cp=spTransform(cp, CRS("+proj=longlat +datum=WGS84"))
+
+cp_75=subset(cp,DEP=="75")
+
+# cp[cp$DEP=="75"]
+
+```
+
+```{r}
+
+cp_bp=read.xlsx("../data_bpce/Corresp_CPostaux_BP v1.xlsx",startRow = 1, colNames = TRUE,
+                    skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+                    namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()
+
+
+cpp_i=subset(cpp,code_postal %in% cp_bp[lib_bp=="BPRI"]$COPOST)
+
+cp_i=subset(cp,ID %in% cp_bp[lib_bp=="BPRI"]$COPOST)
+
+plot(cp_i)
+
+cp_bp[,.N,by=lib_bp]
+
+```
+
+## Communes
+
+
+```{r eval=FALSE}
+
+com=readOGR("../data/geo_data/COMMUNE/COMMUNE.shp",
+            layer="COMMUNE")
+
+# plot(com)
+# names(com)
+
+# com2=readShapeSpatial("../data/geo_data/COMMUNE/LIMITE_COMMUNE.shp")
+# names(com2)
+# length(unique(com2$ID_GEOFLA))
+```
+
+## IRIS
+
+
+DEPCOM
+Caractères (5): Code INSEE de la commune
+NOM_COM
+Caractères (45): Nom de la commune
+IRIS
+Caractères (4): Code de l’Iris. Pour la plupart des communes découpées en Iris, les deux premiers caractères correspondent aux quartiers vécus ("grands quartiers") définis par la commune, les deux derniers caractères sont un numéro séquentiel dans le quartier. Pour les petites communes non découpées, ce code vaut '0000'.
+DCOMIRIS
+Caractères (9): Code complet de l’Iris. Résultat de la concaténation des attributs DEPCOM et IRIS.
+NOM_IRIS
+Caractères (45): Nom de l’Iris. L’attribut peut éventuellement être non-renseigné. Pour les petites communes non découpées, le nom de l'Iris est le nom de la commune.
+TYP_IRIS
+Caractères (1): Type de l'Iris. Il existe trois types d'Iris : habitat, activité, divers. L’attribut peut éventuellement être non-renseigné. Lorsque la commune n’est pas divisée en Iris, la valeur de cet attribut est Z.
+
+
+H: Habitat
+A: Activités
+D: Divers
+Z: Non divisée
+
+
+```{r,eval=FALSE}
+# codes iris: toute france, pour paris, c'est mieux de prendre apur
+
+iris=readOGR("../data/shapefiles/IRIS/CONTOURS-IRIS.shp",
+            layer="CONTOURS-IRIS")
+names(iris)
+
+Encoding(iris[["NOM_IRIS"]]) <- "UTF-8"
+
+iris=spTransform(iris, CRS("+proj=longlat +datum=WGS84"))
+
+iris_75=subset(iris,substr(INSEE_COM,1,2) == "75")
+iris_92=subset(iris,substr(INSEE_COM,1,2) == "92")
+```
+
+### IRIS APUR
+
+```{r}
+iris_apur=readOGR("../data/shapefiles/IRIS/apur/IRIS.shp",
+            layer="IRIS")
+names(iris_apur)
+
+data.table(iris_apur@data)[,.N,by=C_CAINSEE]
+
+Encoding(iris_apur[["L_IR"]]) <- "UTF-8"
+
+iris_apur=spTransform(iris_apur, CRS("+proj=longlat +datum=WGS84"))
+
+plot(iris_apur)
+```
+
+
+```{r}
+## subsets
+
+iris_apur_75=subset(iris_apur,substr(C_CAINSEE,1,2) == "75")
+iris_apur_92=subset(iris_apur,substr(C_CAINSEE,1,2) == "92")
+plot(iris_apur_75)
+plot(iris_apur_92)
+
+```
+
+
+
+## Autres contours
+
+```{r,eval=FALSE}
+## zones touristiques
+
+touri=readOGR("../data/shapefiles/zones-touristiques-internationales/zones-touristiques-internationales.shp",
+            layer="zones-touristiques-internationales")
+
+names(touri)
+Encoding(touri[["name"]]) <- "UTF-8"
+```
+
+
+
+```{r,eval=FALSE}
+# transports en commun
+
+tr=readOGR("../data/transports/emplacement-des-gares-idf/emplacement-des-gares-idf.shp",
+            layer="emplacement-des-gares-idf")
+
+names(tr)
+
+tr_75=subset(tr,gares_id %in% unique(over(iris_75,tr)$gares_id))
+
+tr_data=data.table(tr@data)
+
+
+Encoding(tr_data$nom) <- "UTF-8"
+Encoding(tr_data$mode) <- "UTF-8"
+tr_data[,.N,by=mode]
+
+tr_data[mode=="Métro",]
+tr_data[mode=="Metro",]
+
+```
+
+
+# Cartographie
+
+## ggplot2
+
+```{r}
+library(ggplot2)
+library (rgdal)
+library (rgeos)
+library(maptools)
+library(tmap)
+```
+
+```{r}
+qtm(dep)
+```
+
+On doit transformer les données spdf en données structurées
+
+```{r}
+dep_df <- fortify(dep)
+```
+
+```{r}
+dep.df2 <- fortify(spTransform(dep, CRS("+proj=longlat +datum=WGS84")))
+```
+
+
+```{r}
+
+ggplot()+
+  geom_polygon(data=dep.df2,aes(long,lat,group=group),
+               colour="red",alpha=0.2)+
+  coord_map()+
+  theme_void()+
+  labs(title="Départements français")+
+  theme(legend.position = "none")
+
+```
+
+
+
+## Combiner départements et communes
+
+```{r}
+idf= fortify(spTransform(dep[dep$CODE_DEPT %in% c("75","92","93","94"),], CRS("+proj=longlat +datum=WGS84")))
+
+ggplot()+geom_polygon(data=idf,aes(long,lat,group=group),colour="red",fill="white",alpha=0.2)+
+  coord_map()+
+  theme_void()+
+  labs(title="Départements Grand Paris")
+```
+
+
+```{r}
+
+
+idf.com=fortify(spTransform(cp[cp$DEP %in% c("75","92","93","94"),], CRS("+proj=longlat +datum=WGS84")))
+
+names(cp)
+
+ggplot()+
+  geom_polygon(data=idf.com,aes(long,lat,group=group),colour="red",fill="white",alpha=0.2)+
+  coord_map()+theme_void()+
+  labs(title="Communes et arrondissements Grand Paris")
+
+
+```
+
+On peut superposer les deux:
+
+```{r}
+
+
+map <- ggplot(idf, aes(long,lat,group=group)) +
+  geom_polygon(fill="white",alpha=0)+
+  coord_map(project="globular") +
+  geom_path(data = idf, colour = "red", fill="white",size = .75)+
+  geom_path(data = idf.com, colour = "black", fill="white",size = .2, alpha =0.5)+
+  theme_void()+labs(title="Grand Paris")
+map
+
+
+```
+
+## Leaflet CP
+
+
+```{r}
+cp_75=subset(cp,DEP=="75")
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")
+
+```
+
+
+## Leaflet
+
+
+```{r}
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=touri,opacity = 1,fillOpacity = 0.5,weight = 2,fillColor = "grey",color="black")
+```
+
+
+```{r}
+
+leaflet() %>% 
+  addTiles(group = "OSM (default)")%>% 
+  addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+  addPolygons(data=touri,opacity = 1,fillOpacity = 0.5,
+              weight = 2,fillColor = "grey",
+              color="black",group="Zones touristiques")%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0,weight = 0.8,
+              group="IRIS")%>%
+  # Layers control
+  addLayersControl(
+    baseGroups = c("OSM (default)", "Positron"),
+    overlayGroups = c("Zones touristiques", "IRIS"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+
+```
+
+
+### 92
+
+```{r}
+
+leaflet() %>% 
+  addTiles(group = "OSM (default)")%>% 
+  addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+  addPolygons(data=iris_apur_92,opacity = 1,fillOpacity = 0,weight = 0.8,
+              group="IRIS")%>%
+  # Layers control
+  addLayersControl(
+    baseGroups = c("OSM (default)", "Positron"),
+    overlayGroups = c( "IRIS"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+```
+
+
+
+## ggmap
+
+Maintenant il faut s'enrigistrer auprès de Google pour avoir un compte avant de faire appel à leur API
+
+```{r eval=FALSE}
+
+library(ggmap)
+
+gm=get_map("paris",zoom = 13)
+p=ggmap(gm)
+
+p+coord_map()
+
+```
+
+# Fusion données
+
+
+## Revenu
+
+
+```{r}
+fildisp_75[,.(.N,m=mean(DISP_MED18)),by=c("COM")]%>%
+  ggplot(aes(m,COM))+geom_point()+theme_bw()
+
+# exploration
+
+fildisp_75[COM=="75118",]%>%
+  ggplot(aes(montant,IRIS,color=dispd))+geom_point()+theme_bw()
+
+fildisp_75[COM=="75108",]%>%
+  ggplot(aes(montant,IRIS,color=dispd))+geom_point()+theme_bw()
+
+```
+
+
+```{r}
+# jointure avec les contours iris
+
+names(iris_75)
+
+iris_75_disp=sp::merge(iris_75,fildisp_75,by.x="CODE_IRIS",by.y="IRIS")
+
+names(iris_75_disp)
+
+
+```
+
+```{r}
+
+
+intervalles <-seq(0,0.5,0.05)
+
+pal_num <- colorBin( c("blue","yellow","red"), 
+                      bins=intervalles, na.color = "#aaff56")
+
+
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, n = 20)
+
+
+leaflet() %>% 
+  addTiles(group = "OSM (default)")%>% 
+  addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+  addPolygons(data=touri,opacity = 1,fillOpacity = 0.5,
+              weight = 2,fillColor = "grey",
+              fill="black",group="Zones touristiques")%>%
+  addPolygons(data=iris_75_disp,opacity = 1,fillOpacity = 0.6,weight = 0.8,
+              group="IRIS",
+              color = ~pal_num(DISP_MED18))%>%
+  # Layers control
+  addLayersControl(
+    baseGroups = c("OSM (default)", "Positron"),
+    overlayGroups = c("Zones touristiques", "IRIS"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+
+```
+
+## Carte revenu 92
+
+```{r}
+fildisp
+iris_92_disp=sp::merge(iris_apur_92,fildisp_92,by.x="C_IR",by.y="IRIS")
+
+```
+
+```{r}
+
+intervalles <-seq(0,0.5,0.05)
+
+pal_num <- colorBin( c("blue","yellow","red"), 
+                      bins=intervalles, na.color = "#aaff56")
+
+
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, n = 20)
+
+
+leaflet() %>% 
+  addTiles(group = "OSM (default)")%>% 
+  addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+  addPolygons(data=iris_92_disp,opacity = 1,fillOpacity = 0.6,weight = 0.8,
+              group="IRIS",
+              color = ~pal_num(DISP_MED18),
+              popup = ~paste0(LIBIRIS,"<br>Revenu médian : ",DISP_MED18))%>%
+  # Layers control
+  addLayersControl(
+    baseGroups = c("OSM (default)", "Positron"),
+    overlayGroups = c("Zones touristiques", "IRIS"),
+    options = layersControlOptions(collapsed = FALSE)
+  )%>%
+  leaflet::addLegend(data=iris_92_disp,
+                     position="bottomright",
+                     pal=pal_num,
+                     values=~DISP_MED18,
+                     title ="Valeur")
+
+
+```
+
+
+## Carte revenu IDF
+
+```{r}
+
+iris_disp_idf=sp::merge(iris_apur,fildisp,by.x="C_IR",by.y="IRIS",all.x=T)
+iris_dec_idf=sp::merge(iris_apur,fildec,by.x="C_IR",by.y="IRIS",all.x=T)
+
+iris_dec_idf@data%>%names()
+
+```
+
+```{r}
+
+intervalles <-seq(0,0.5,0.05)
+
+pal_num <- colorBin( c("blue","yellow","red"), 
+                      bins=intervalles, na.color = "#aaff56")
+
+
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, n = 20)
+
+
+leaflet() %>% 
+  addTiles(group = "OSM (default)")%>% 
+  addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+  addPolygons(data=iris_disp_idf,opacity = 1,fillOpacity = 0.6,weight = 0.8,
+              group="IRIS",
+              color = ~pal_num(DISP_MED18),
+              popup = ~paste0(LIBIRIS,"<br>Revenu médian : ",DISP_MED18))%>%
+  # Layers control
+  addLayersControl(
+    baseGroups = c("OSM (default)", "Positron"),
+    overlayGroups = c("Zones touristiques", "IRIS"),
+    options = layersControlOptions(collapsed = FALSE)
+  )%>%
+  leaflet::addLegend(data=iris_disp_idf,
+                     position="bottomright",
+                     pal=pal_num,
+                     values=~DISP_MED18,
+                     title ="Valeur")
+
+
+```
+
+# sf
+
+
+```{r}
+library(sf)
+library(ggplot2)
+
+touri_sf=st_read("../data/shapefiles/zones-touristiques-internationales/zones-touristiques-internationales.shp")
+
+a2 <-touri_sf  %>% 
+  mutate(lon = map_dbl(geometry, ~st_point_on_surface(.x)[[1]]),
+         lat = map_dbl(geometry, ~st_point_on_surface(.x)[[2]]))
+
+
+# using rgeos
+sp_cent <- gCentroid(as(touri_sf, "Spatial"), byid = TRUE)
+
+# using sf
+sf_cent <- st_centroid(touri_sf)
+
+
+st_centroid_within_poly <- function (poly) {
+
+  # check if centroid is in polygon
+  ctrd <- st_centroid(poly, of_largest_polygon = TRUE)
+  in_poly <- diag(st_within(ctrd, poly, sparse = F))
+
+  # replace geometries that are not within polygon with st_point_on_surface()
+  st_geometry(ctrd[!in_poly,]) <- st_geometry(st_point_on_surface(poly[!in_poly,]))
+
+  ctrd
+}
+
+sf_cent_in <-st_centroid_within_poly(touri_sf)
+
+
+
+# plot both together to confirm that they are equivalent
+ggplot() + 
+  geom_sf(data = touri_sf, fill = 'white') +
+  geom_sf(data = sp_cent %>% st_as_sf, color = 'blue') + 
+  geom_sf(data = sf_cent_in, color = 'green',size=10,pch=1) + 
+  geom_sf(data = sf_cent, color = 'red')+theme_void()
+
+
+```
+
+
+
+
+

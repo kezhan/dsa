@@ -1,0 +1,34 @@
+
+curl "https://api-adresse.data.gouv.fr/search/?q=8+bd+du+port"
+
+```{r}
+req <- curl_fetch_memory("https://api-adresse.data.gouv.fr/search/?q=8+bd+du+port")
+
+str(req)
+
+```
+
+```{r}
+parse_headers(req$headers)
+
+jsonlite::prettify(rawToChar(req$content))
+
+```
+
+```{r}
+
+library(httr)
+r <- GET("https://api-adresse.data.gouv.fr/search", add_headers(q = "8+bd+du+port"))
+?GET
+
+GET(handle = google, path = "/")
+
+GET(handle = "https://api-adresse.data.gouv.fr", path = "search", 
+    add_headers(q = "8+bd+du+port"))
+
+
+```
+
+
+
+

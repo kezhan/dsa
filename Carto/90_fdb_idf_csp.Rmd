@@ -1,0 +1,180 @@
+---
+title: "IDF - CSP"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+<style>
+.dataTables_scrollBody {
+    max-height: 100% !important;
+}
+</style>
+
+
+```{r,eval=FALSE}
+render("90_fdb_idf_csp.Rmd","flexdashboard::flex_dashboard",
+       encoding="UTF-8",
+       output_dir = "fdb_fichier",
+       quiet = T,
+       output_options=list(self_contained=F))
+       
+```
+
+
+# Données
+
+## Row {.tabset .tabset-fade}
+
+### 92
+
+```{r,eval=F}
+
+normalize <- function(x, na.rm = TRUE) {
+    return((x- min(x, na.rm = TRUE)) /(max(x, na.rm = TRUE)-min(x, na.rm = TRUE)))
+}
+
+
+iris_csp_idf=sp::merge(iris_apur,csp,by.x="C_IR",by.y="IRIS",all.x=T)
+
+names(iris_csp_idf)
+
+iris_csp_idf@data=iris_csp_idf@data%>%
+  mutate(densite=P17_POP/SHAPE_Area*1000,
+         densite_norm=normalize(P17_POP/SHAPE_Area*1000,na.rm=T))
+
+hist(iris_csp_idf@data$densite)
+view(iris_csp_idf@data)
+
+names(iris_csp_idf@data)
+iris_csp_idf_data=data.table(iris_csp_idf@data)
+iris_csp_idf_data[densite>100,]
+iris_csp_idf_data[densite>40,c("M2_IP","M2_POP","densite","densite_norm")]
+
+```
+
+
+```{r}
+
+data.table(iris_csp_idf@data)[substr(as.character(C_IR),1,2)=="92"]%>%
+  select(-OBJECTID)%>%
+  datatable()
+
+
+```
+
+
+### 75
+
+```{r}
+
+data.table(iris_csp_idf@data)[substr(as.character(C_IR),1,2)=="75"]%>%
+  select(-OBJECTID)%>%
+  datatable()
+
+
+```
+
+### Infos variables
+
+C17_POP15P_CS1	Pop 15 ans ou plus Agriculteurs exploitants en 2017 (compl)
+C17_POP15P_CS2	Pop 15 ans ou plus Artisans, Comm., Chefs entr. en 2017 (compl)
+C17_POP15P_CS3	Pop 15 ans ou plus Cadres, Prof. intel. sup. en 2017 (compl)
+C17_POP15P_CS4	Pop 15 ans ou plus Prof. intermédiaires en 2017 (compl)
+C17_POP15P_CS5	Pop 15 ans ou plus Employés en 2017 (compl)
+C17_POP15P_CS6	Pop 15 ans ou plus Ouvriers en 2017 (compl)
+C17_POP15P_CS7	Pop 15 ans ou plus Retraités en 2017 (compl)
+C17_POP15P_CS8	Pop 15 ans ou plus Autres en 2017 (compl)
+
+
+# CSP
+
+## Row {.tabset .tabset-fade}
+
+### 3 Cadre
+
+```{r}
+
+carte_csp=function(data=iris_csp_idf,
+                   var="DEC_MED18",label="Revenu déclaré médian") {
+  leaflet() %>% 
+    addTiles(group = "OSM (default)")%>% 
+    addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+    addPolygons(data=iris_apur_insee,opacity = 1,fillOpacity = 0,
+                weight = 0.8,color="blue",
+                group="Communes")%>%
+    addPolygons(data=data,opacity = 1,fillOpacity = 0.5,weight = 0.8,
+                group="IRIS",
+                color = ~pal_num(get(var)),
+                popup = ~paste0(LIBIRIS,
+                                "<br>Population 2017 : ",P17_POP,
+                                "<br>1 Agriculteurs : ",round(ratio_csp1,2),
+                                "<br>2 Artisans, coms. : ",round(ratio_csp2,2),
+                                "<br>3 cadres : ",round(ratio_csp3,2),
+                                "<br>4 Prof interm : ",round(ratio_csp4,2),
+                                "<br>5 Employés : ",round(ratio_csp5,2),
+                                "<br>6 Ouvriers : ",round(ratio_csp6,2),
+                                "<br>7 Retraités : ",round(ratio_csp7,2),
+                                "<br>8 Autres : ",round(ratio_csp7,2)))%>%
+    addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+    addPolygons(data=iris_apur_dep,opacity = 1,fillOpacity = 0,
+                weight = 1,color="black",
+                group="Départements")%>%
+    # Layers control
+    addLayersControl(
+      baseGroups = c("OSM (default)", "Positron"),
+      overlayGroups = c("Départements","Communes", "IRIS"),
+      options = layersControlOptions(collapsed = FALSE)
+    )%>%
+    leaflet::addLegend(data=data,
+                       position="bottomright",
+                       pal=pal_num,
+                       values=~get(var),
+                       title ="Valeur")
+}
+
+
+
+carte_csp(data=iris_csp_idf,var="ratio_csp3",label="Taux de CSP3")
+
+names(iris_csp_idf)
+```
+
+
+
+### 4 Prof. intermédiaires
+
+```{r}
+
+carte_csp(data=iris_csp_idf,var="ratio_csp4",label="Taux de CSP4")
+
+```
+
+
+### 5 Employés
+
+```{r}
+carte_csp(data=iris_csp_idf,var="ratio_csp5",label="Taux de CSP5")
+
+```
+
+
+### 6 Ouvriers
+
+```{r}
+carte_csp(data=iris_csp_idf,var="ratio_csp6",label="Taux de CSP6")
+
+```
+
+
+### 7 Retraités
+
+```{r}
+carte_csp(data=iris_csp_idf,var="ratio_csp7",label="Taux de CSP7")
+
+```
+

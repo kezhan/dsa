@@ -1,0 +1,165 @@
+---
+title: "Interpolation"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    navbar:
+      - { title: "Accueil", href: "index.html", align: right}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+
+
+
+# CSP IDF
+
+## Row {.tabset}
+
+### Sans lissage
+
+
+```{r}
+pal_num <- colorNumeric(c("blue","yellow","red"), NULL, n = 20)
+# 
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_idf_csp,opacity = 1,fillOpacity = 0.5,weight = 0.8,color="black",
+              fillColor = ~pal_num(ratio_csp3),
+              popup=~paste(CODE_IRIS,NOM_IRIS,"<br>",format(C17_POP15P_CS3,digits=0),
+                           "<br>",ratio_csp3))%>%
+  leaflet::addLegend(data=iris_idf_csp,position="bottomright",pal=pal_num,values=~ratio_csp3)
+
+```
+
+### Carte statique
+
+```{r,eval=FALSE}
+
+# iris_75_csp_point
+
+iris_idf_csp_point=st_as_sf(iris_idf_csp) %>% 
+  st_point_on_surface()
+
+iris_idf_csp_point=subset(iris_idf_csp_point,is.na(ratio_csp3)==F)
+iris_idf_csp_point=subset(iris_idf_csp_point,P17_POP>500)
+
+v0 = gstat::variogram(ratio_csp3~1, iris_idf_csp_point)
+plot(v0, plot.numbers = TRUE)
+
+v.m = fit.variogram(v0, vgm(1, "Exp", 100))
+
+plot(v0, v.m, plot.numbers = TRUE)
+
+g = st_make_grid(st_as_sf(iris_idf_csp),what = "centers",n=c(100,100))
+
+```
+
+```{r,eval=FALSE}
+# idw, pas fait encore
+
+i = idw(ratio_csp3~1, iris_75_csp_point, g)
+
+ggplot() + geom_stars(data = i, aes(fill = var1.pred, x = x, y = y)) + 
+    geom_sf(data = iris_75_csp_point)
+
+idata=cbind(data.table(st_coordinates(i)),
+      var1.pred=i$var1.pred)
+
+
+ggplot() + geom_raster(data = idata, 
+                       aes(fill = var1.pred, x = X, y = Y)) +
+  scale_fill_distiller(palette = "Spectral")+ 
+    geom_sf(data = st_as_sf(iris_75_csp),alpha=0)
+
+
+plot(i)
+```
+
+```{r}
+
+# krige
+
+k = krige(ratio_csp3~1, iris_idf_csp_point, g, v.m)
+
+# intersection
+
+k2 =st_intersection(x = k, y = st_as_sf(iris_idf))
+
+kdata2=cbind(data.table(st_coordinates(k2)),
+      var1.pred=k2$var1.pred)
+
+# sans intersection
+
+kdata=cbind(data.table(st_coordinates(k)),
+      var1.pred=k$var1.pred)
+
+
+ggplot()  +geom_raster(data=kdata,aes(fill=var1.pred,x=X,y=Y))+
+  scale_fill_distiller(palette = "Spectral")+ 
+    geom_sf(data = st_as_sf(iris_idf_csp),alpha=0)
+
+
+```
+
+### Carte interactive
+
+```{r}
+hv=acast(kdata, X ~ Y, value.var = "var1.pred")
+
+CL <- contourLines(unique(kdata$X) , unique(kdata$Y) , as.matrix(hv),nlevels =10)
+
+## EXTRACT CONTOUR LINE LEVELS
+LEVS <- as.factor(sapply(CL, `[[`, "level"))
+
+NLEV <- length(levels(LEVS))
+```
+
+```{r}
+colfunc_cs3ratio<-colorRampPalette(c("red","yellow","springgreen"))
+
+plot(rep(1,NLEV),col=rev(colfunc_cs3ratio(NLEV)), pch=19,cex=2)
+
+```
+
+```{r}
+
+## CONVERT CONTOUR LINES TO POLYGONS
+pgons <- lapply(1:length(CL), function(i)
+  Polygons(list(Polygon(cbind(CL[[i]]$x, CL[[i]]$y))), ID=i))
+spgons = SpatialPolygons(pgons)
+
+## Leaflet map with polygons
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron,group="carte") %>%
+  addPolygons(data=spgons,
+              color = rev(colfunc(NLEV)[LEVS])) %>%
+  addPolygons(data=iris_idf,opacity = 1,
+              fillOpacity = 0,weight = 0.4,
+              popup = ~paste(CODE_IRIS,NOM_IRIS),
+              group="Code IRIS")%>%
+  addPolygons(data=cp_75,opacity = 1,fillOpacity = 0,weight = 1.2,color="black",
+              group="Code postal")%>%
+  addPolylines(data=lignes_metro_75,color = "green",weight =3,group="Lignes métro")%>%
+  addLabelOnlyMarkers(
+    data=tr_75,label = ~nom,
+    labelOptions = labelOptions(noHide = T, direction = 'top',
+                                textOnly = FALSE,
+                                textsize = "10px"),
+    group="Stations métro"
+  )%>%
+  # Layers control
+  addLayersControl(
+    overlayGroups = c("Code postal","Code IRIS","Lignes métro","Stations métro"),
+    options = layersControlOptions(collapsed = FALSE))%>%
+  leaflet::addLegend(position="bottomright",
+                     colors=rev(colfunc(NLEV)),labels=levels(LEVS))
+
+```
+
+
+
+

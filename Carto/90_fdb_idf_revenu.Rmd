@@ -1,0 +1,225 @@
+---
+title: "IDF"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+<style>
+.dataTables_scrollBody {
+    max-height: 100% !important;
+}
+</style>
+
+
+```{r,eval=FALSE}
+
+options(DT.options = list(pageLength = 100, language = list(search = "Rechercher :"),
+                          dom = 'Bfrtip',
+                          buttons = c('copy', 'csv', 'excel')))
+
+
+render("90_fdb_idf_revenu.Rmd","flexdashboard::flex_dashboard",
+       encoding="UTF-8",
+       output_dir = "fdb_fichier",
+       quiet = T,
+       output_options=list(self_contained=F))
+
+
+       
+```
+
+
+
+```{r,eval=FALSE}
+
+iris_disp_idf_data=data.table(iris_disp_idf@data)
+iris_dec_idf_data=data.table(iris_dec_idf@data)
+
+iris_disp_idf_data[,.N,by=C_TYPEIR]
+
+iris_disp_idf_data[grepl("Jean M",L_IR),]
+
+ggplot()+
+  geom_density(data=iris_disp_idf_data,aes(DISP_MED18))+
+  geom_density(data=iris_disp_idf_data,aes(DISP_D918))
+
+
+# dec vs disp
+
+iris_disp_dec_idf=sp::merge(iris_disp_idf,iris_dec_idf,by="C_IR")
+
+iris_disp_dec_idf@data$ratiomed18=iris_disp_dec_idf@data$DEC_MED18/iris_disp_dec_idf@data$DISP_MED18
+
+hist(iris_disp_dec_idf_data$ratio)
+
+carte_revenu(data=iris_disp_dec_idf,var="ratiomed18",label="Revenu disponible 1er décile")
+
+```
+
+# Données
+
+
+## Row {.tabset .tabset-fade}
+
+
+### 75
+
+```{r}
+
+iris_disp_idf_data[substr(as.character(C_IR),1,2)=="75"]%>%
+  select(-OBJECTID)%>%
+  datatable()
+
+
+```
+
+
+### 92
+
+```{r}
+
+iris_disp_idf_data[substr(as.character(C_IR),1,2)=="92"]%>%
+  select(-OBJECTID)%>%
+  datatable()
+
+
+```
+
+
+
+
+# Revenu déclaré
+
+```{r,eval=FALSE}
+iris_apur_insee <- unionSpatialPolygons(iris_apur, iris_apur@data$C_CAINSEE)
+iris_apur_dep <- unionSpatialPolygons(iris_apur, substr(iris_apur@data$C_CAINSEE,1,2))
+
+plot(iris_apur_insee)
+plot(iris_apur_dep)
+
+```
+
+## Row {.tabset .tabset-fade}
+
+### Médiane
+
+
+```{r}
+intervalles <-seq(0,0.5,0.05)
+
+pal_num <- colorBin( c("blue","yellow","red"), 
+                      bins=intervalles, na.color = "#CAC7C7")
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, na.color = "#CAC7C7")
+
+carte_revenu=function(data=iris_dec_idf,
+    var="DEC_MED18",label="Revenu déclaré médian") {
+  leaflet() %>% 
+    addTiles(group = "OSM (default)")%>% 
+    addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+    addPolygons(data=iris_apur_insee,opacity = 1,fillOpacity = 0,
+                weight = 0.8,color="blue",
+                group="Communes")%>%
+    addPolygons(data=data,opacity = 1,fillOpacity = 0.5,weight = 0.8,
+                group="IRIS",
+                color = ~pal_num(get(var)),
+                popup = ~paste0(LIBIRIS,
+                                "<br>M2_POP : ",M2_POP,
+                                "<br>",label," : ",round(get(var),2)))%>%
+    addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+    addPolygons(data=iris_apur_dep,opacity = 1,fillOpacity = 0,
+                weight = 1,color="black",
+                group="Départements")%>%
+    # Layers control
+    addLayersControl(
+      baseGroups = c("OSM (default)", "Positron"),
+      overlayGroups = c("Départements","Communes", "IRIS"),
+      options = layersControlOptions(collapsed = FALSE)
+    )%>%
+    leaflet::addLegend(data=data,
+                       position="bottomright",
+                       pal=pal_num,
+                       values=~get(var),
+                       title ="Valeur")
+}
+
+carte_revenu()
+names(iris_dec_idf)
+
+
+```
+
+### 1er décile
+
+```{r}
+
+carte_revenu(data=iris_dec_idf,var="DEC_D118",label="Revenu disponible 1er décile")
+
+```
+
+
+
+### 9e décile
+
+```{r}
+
+carte_revenu(data=iris_dec_idf,var="DEC_D918",label="Revenu disponible 9e décile")
+
+
+```
+
+
+
+
+# Revenu disponible
+
+## Row {.tabset .tabset-fade}
+
+```{r,eval=FALSE}
+names(iris_disp_idf)
+```
+
+### Médiane
+
+```{r}
+
+carte_revenu(data=iris_disp_idf,var="DISP_MED18",label="Revenu disponible médian")
+
+
+```
+
+### 9e décile
+
+```{r}
+
+carte_revenu(data=iris_disp_idf,var="DISP_D918",label="Revenu disponible 9e décile")
+
+
+```
+
+
+
+### Carte taux de pauvreté
+
+```{r}
+
+
+carte_revenu(data=iris_disp_idf,var="DISP_TP6018",label="Revenu disponible taux de pauvreté")
+
+
+```
+
+
+### Gini
+
+```{r}
+
+carte_revenu(data=iris_disp_idf,var="DISP_GI18",label="Revenu disponible Gini")
+
+```
+
+

@@ -1,0 +1,163 @@
+---
+title: "Revenu médian par IRIS"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    navbar:
+      - { title: "Accueil", href: "index.html", align: right}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r,eval=FALSE}
+  render("99_flexdashboard.Rmd","flexdashboard::flex_dashboard",
+       encoding="UTF-8",
+       output_dir = "fdb_fichier",
+       quiet = T,
+       output_options=list(self_contained=TRUE))
+       
+```
+
+
+
+```{r,eval=FALSE}
+
+iris_disp_idf_data=data.table(iris_disp_idf@data)
+
+iris_disp_idf_data[,.N,by=C_TYPEIR]
+
+iris_disp_idf_data[grepl("Jean M",L_IR),]
+
+```
+
+
+```{r}
+
+ggplot()+
+  geom_density(data=iris_disp_idf_data,aes(DISP_MED18))+
+  geom_density(data=iris_disp_idf_data,aes(DISP_D918))
+
+
+
+```
+
+
+### Carte revenu dec
+
+
+```{r}
+
+leaflet() %>% 
+  addTiles(group = "OSM (default)")%>% 
+  addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+  addPolygons(data=iris_dec_idf,opacity = 1,fillOpacity = 0.6,weight = 0.8,
+              group="IRIS",
+              color = ~pal_num(DEC_MED18),
+              popup = ~paste0(LIBIRIS,"<br>Revenu déclaré médian : ",DEC_MED18))%>%
+  # Layers control
+  addLayersControl(
+    baseGroups = c("OSM (default)", "Positron"),
+    options = layersControlOptions(collapsed = FALSE)
+  )%>%
+  leaflet::addLegend(data=iris_dec_idf,
+                     position="bottomright",
+                     pal=pal_num,
+                     values=~DEC_MED18,
+                     title ="Valeur")
+
+```
+
+### Carte 9e décile
+
+```{r}
+intervalles <-seq(0,0.5,0.05)
+
+pal_num <- colorBin( c("blue","yellow","red"), 
+                      bins=intervalles, na.color = "#CAC7C7")
+
+
+pal_num <- colorNumeric(c("blue","yellow","red"),NULL, na.color = "#CAC7C7")
+
+
+leaflet() %>% 
+  addTiles(group = "OSM (default)")%>% 
+  addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+  addPolygons(data=iris_disp_idf,opacity = 1,fillOpacity = 0.6,weight = 0.8,
+              group="IRIS",
+              color = ~pal_num(DISP_D918),
+              popup = ~paste0(LIBIRIS,"<br>Revenu médian : ",DISP_MED18))%>%
+  # Layers control
+  addLayersControl(
+    baseGroups = c("OSM (default)", "Positron"),
+    options = layersControlOptions(collapsed = FALSE)
+  )%>%
+  leaflet::addLegend(data=iris_disp_idf,
+                     position="bottomright",
+                     pal=pal_num,
+                     values=~DISP_D918,
+                     title ="Valeur")
+
+```
+
+
+
+
+
+### Carte médiane
+
+```{r}
+
+leaflet() %>% 
+  addTiles(group = "OSM (default)")%>% 
+  addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+  addPolygons(data=iris_disp_idf,opacity = 1,fillOpacity = 0.6,weight = 0.8,
+              group="IRIS",
+              color = ~pal_num(DISP_MED18),
+              popup = ~paste0(LIBIRIS,"<br>Revenu médian : ",DISP_MED18))%>%
+  # Layers control
+  addLayersControl(
+    baseGroups = c("OSM (default)", "Positron"),
+    options = layersControlOptions(collapsed = FALSE)
+  )%>%
+  leaflet::addLegend(data=iris_disp_idf,
+                     position="bottomright",
+                     pal=pal_num,
+                     values=~DISP_MED18,
+                     title ="Valeur")
+
+```
+
+
+
+### Carte taux de pauvreté
+
+```{r}
+
+leaflet() %>% 
+  addTiles(group = "OSM (default)")%>% 
+  addProviderTiles(providers$CartoDB.Positron,group = "Positron")%>%
+  addPolygons(data=iris_disp_idf,opacity = 1,fillOpacity = 0.6,weight = 0.8,
+              group="IRIS",
+              color = ~pal_num(DISP_TP6018),
+              popup = ~paste0(LIBIRIS,"<br>Revenu médian : ",DISP_MED18))%>%
+  # Layers control
+  addLayersControl(
+    baseGroups = c("OSM (default)", "Positron"),
+    options = layersControlOptions(collapsed = FALSE)
+  )%>%
+  leaflet::addLegend(data=iris_disp_idf,
+                     position="bottomright",
+                     pal=pal_num,
+                     values=~DISP_TP6018,
+                     title ="Valeur")
+
+```
+
+
+
+
+
+

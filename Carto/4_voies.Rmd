@@ -1,0 +1,291 @@
+---
+title: "Voies"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    navbar:
+      - { title: "Accueil", href: "index.html", align: right }
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r,eval=FALSE}
+# https://opendata.apur.org/datasets/Apur::troncon-voie/about
+
+names(voies_75_asso)
+
+```
+
+# Carto
+
+## Row {.tabset}
+
+### Voies Paris
+
+```{r,eval=TRUE}
+# avec données ING
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0.3,weight = 0.5,
+              fillColor  = ~factpal(TYP_IRIS),
+              popup=~paste(CODE_IRIS,NOM_IRIS,TYP_IRIS))%>%
+  addPolylines(data=voies_75,opacity = 1,fillOpacity = 0.5,weight = 2,
+               fillColor = "grey",
+               color="black",
+               popup=~paste("identifiant voie: ",objectid))
+
+```
+
+
+```{r,eval=FALSE}
+# Apur
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0.3,weight = 0.5,
+              fillColor  = ~factpal(C_TYPEIR),
+              popup=~paste(C_IR,L_IR,
+                           "<br>Type ",C_TYPEIR))%>%
+  addPolylines(data=voies_75,opacity = 1,fillOpacity = 0.5,weight = 2,
+               fillColor = "grey",
+               color="black",
+               popup=~paste("identifiant voie: ",objectid))
+
+```
+
+### Linéaire commercial
+
+```{r,eval=TRUE}
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0.5,weight = 0.8,
+              fillColor  = ~factpal(TYP_IRIS),
+              popup=~paste(CODE_IRIS,NOM_IRIS,TYP_IRIS))%>%
+  addPolylines(data=lincom,opacity = 1,fillOpacity = 0.5,weight = 2,
+               fillColor = "grey",
+               color="black")
+
+```
+
+
+### Linéaire commercial (apur)
+
+```{r,eval=TRUE}
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_apur_75,opacity = 1,fillOpacity = 0.5,weight = 0.8,
+              fillColor  = ~factpal(C_TYPEIR),
+              popup=~paste(C_IR," - ",L_IR,
+                           "<br>Type: ",C_TYPEIR))%>%
+  addPolylines(data=lincom,opacity = 1,fillOpacity = 0.5,weight = 2,
+               fillColor = "grey",
+               color="black",
+               group="Linéaires commerciaux")
+
+```
+
+### Linéaire commercial (apur)
+
+```{r,eval=TRUE}
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_apur_75,opacity = 1,fillOpacity = 0.5,weight = 0.8,
+              fillColor  = ~factpal(C_TYPEIR),
+              popup=~paste(C_IR," - ",L_IR,
+                           "<br>Type: ",C_TYPEIR))%>%
+  addPolylines(data=subset(lincom,OBJECTID==6790),opacity = 1,fillOpacity = 0.5,weight = 2,
+               fillColor = "grey",
+               color="black")
+
+# OBJECTID dans lincom sur deux codes iris: 58, 63
+# en dehors de paris: 6790
+
+```
+### Commerces au RDC
+
+```{r,eval=TRUE}
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addCircles(data=bdcom,opacity = 1,fillOpacity = 0.5,weight = 2,
+               fillColor = "grey",
+               color="black")
+
+```
+
+# Associations
+
+## Row {.tabset}
+
+
+### Nombres
+
+```{r}
+pal_voies=colorNumeric(c("blue","yellow","red"), NULL, n = 10)
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=voies_75_asso,opacity = 1,fillOpacity = 0.5,weight = 2,
+               fillColor = "grey",
+               color=~pal_voies(N),
+               popup=~paste("identifiant voie: ",objectid,"<br>Nombre d'asso: ",N))%>%
+  leaflet::addLegend(data=voies_75_asso,position="bottomright",pal=pal_voies,values=~N)
+```
+
+### Densité
+
+```{r,eval=FALSE}
+
+siret_paris_iris_voies[cj2=="92"]
+sum(voies_stat$N)
+
+```
+
+```{r}
+# points singuliers avec une forte concentration par adresse
+
+points_singuliers=siret_paris_iris_voies[cj2=="92",
+                       .N,
+                       by=c("latitude","longitude","geo_adresse")][N>8]
+# stat par tronçon de voie
+
+voies_stat=siret_paris_iris_voies[cj2=="92",
+                                               .N,by=objectid]%>%
+  merge(voies_75@data[,c("objectid","shape_Leng")],by="objectid",
+                             all.x=T)%>%
+  mutate(densite_m=N/shape_Leng)%>%
+  arrange(desc(densite_m))%>%
+  filter(densite_m>0.1)
+
+# fusion avec le fonds de carte
+
+voies_75_vis=sp::merge(voies_75,
+                        voies_stat,
+                        by.x="objectid",by.y="objectid")
+
+voies_75_vis=subset(voies_75_vis,objectid %in% voies_stat$objectid)
+
+#pal_voies=colorQuantile(c("blue","yellow","red"), NULL, n = 10)
+
+pal_voies=colorNumeric(c("blue","yellow","red"), NULL, n = 10)
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data=iris_75,opacity = 1,fillOpacity = 0.3,weight = 0.5,
+              fillColor  = ~factpal(TYP_IRIS),
+              popup=~paste(CODE_IRIS,NOM_IRIS,TYP_IRIS))%>%
+  addPolylines(data=voies_75_vis,opacity = 1,fillOpacity = 0.5,weight = 5,
+               fillColor = "grey",
+               color=~pal_voies(densite_m),
+               popup=~paste("identifiant voie: ",objectid,
+                            "<br>Nombre par tronçon : ",N,
+                            "<br>Densité par 10 m: ",format(densite_m*10,digits=2)))%>%
+  leaflet::addLegend(data=voies_75_vis,position="bottomright",
+                     pal=pal_voies,values=~densite_m*10,
+                     title ="Densité par 10 mètres")%>%
+  addCircles(data=points_singuliers,weight = ~N/20,
+             popup = ~paste(geo_adresse,
+                            "<br>Nombre par adresse: ",N),
+             color="black")
+
+```
+
+
+
+# Restaurants
+
+## Row {.tabset}
+
+### Nombres
+
+```{r,eval=FALSE}
+siret_paris_iris_voies[activitePrincipaleUniteLegale %in% c("5610A","5610C"),.N,by=objectid][N>10]
+
+```
+
+```{r}
+
+voies_75_vis=sp::merge(voies_75,
+                        siret_paris_iris_voies[activitePrincipaleUniteLegale %in% c("5610A","5610C"),
+                                               .N,by=objectid][N>10],
+                        by.x="objectid",by.y="objectid")
+
+pal_voies=colorNumeric(c("blue","yellow","red"), NULL, n = 10)
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=voies_75_vis,opacity = 1,fillOpacity = 0.5,weight = 2,
+               fillColor = "grey",
+               color=~pal_voies(N),
+               popup=~paste("identifiant voie: ",objectid,"<br>Nombre d'asso: ",N))%>%
+  leaflet::addLegend(data=voies_75_vis,position="bottomright",pal=pal_voies,values=~N)
+
+```
+
+
+
+### Restaurants par mètre
+
+```{r,eval=FALSE}
+
+siret_paris_iris_voies[activitePrincipaleUniteLegale %in% c("5610A","5610C")]
+
+
+sum(voies_stat$N)
+
+```
+
+```{r}
+# points singuliers avec une forte concentration par adresse
+
+points_singuliers=siret_paris_iris_voies[activitePrincipaleUniteLegale %in% c("5610A","5610C"),
+                       .N,
+                       by=c("latitude","longitude","geo_adresse")][N>8]
+# stat par tronçon de voie
+
+voies_stat=siret_paris_iris_voies[activitePrincipaleUniteLegale %in% c("5610A","5610C"),
+                                               .N,by=objectid]%>%
+  merge(voies_75@data[,c("objectid","shape_Leng")],by="objectid",
+                             all.x=T)%>%
+  mutate(densite_m=N/shape_Leng)%>%
+  arrange(desc(densite_m))%>%
+  filter(densite_m>0.1)
+
+# fusion avec le fonds de carte
+
+voies_75_vis=sp::merge(voies_75,
+                        voies_stat,
+                        by.x="objectid",by.y="objectid")
+
+voies_75_vis=subset(voies_75_vis,objectid %in% voies_stat$objectid)
+
+#pal_voies=colorQuantile(c("blue","yellow","red"), NULL, n = 10)
+
+pal_voies=colorNumeric(c("blue","yellow","red"), NULL, n = 10)
+
+leaflet()%>% addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolylines(data=voies_75_vis,opacity = 1,fillOpacity = 0.5,weight = 2,
+               fillColor = "grey",
+               color=~pal_voies(densite_m),
+               popup=~paste("identifiant voie: ",objectid,
+                            "<br>Nombre par tronçon : ",N,
+                            "<br>Densité par 10 m: ",format(densite_m*10,digits=2)))%>%
+  leaflet::addLegend(data=voies_75_vis,position="bottomright",
+                     pal=pal_voies,values=~densite_m*10,
+                     title ="Densité par 10 mètres")%>%
+  addCircles(data=points_singuliers,
+             popup = ~paste(geo_adresse,
+                            "<br>Nombre par adresse: ",N),
+             color="black")
+
+```
+
+# Données
+
+## Row  {.tabset}
+
+### Données
+
+```{r}
+
+siret_paris_iris_voies[,.N,by=objectid][order(-N)]
+
+```
+

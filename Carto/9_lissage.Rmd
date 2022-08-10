@@ -1,0 +1,339 @@
+---
+title: "Lissage"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Des tests ici
+
+
+# Introduction
+
+http://r.iresmi.net/2019/05/11/kernel-spatial-smoothing-transforming-points-pattern-to-continuous-coverage/
+
+
+```{r cars}
+library(raster)  # load before dplyr (against select conflict)
+library(tidyverse)
+library(httr)
+library(sf)
+library(btb)
+
+
+
+# create a unique polygon for France (our study zone)
+fr <- read_sf("data/ADMIN-EXPRESS_2-0__SHP__FRA_2019-03-14/ADMIN-EXPRESS/1_DONNEES_LIVRAISON_2019-03-14/ADE_2-0_SHP_LAMB93_FR/REGION.shp") %>% 
+  st_union() %>%
+  st_sf() %>% 
+  st_set_crs(2154)
+
+
+# load communes ; convert to points
+comm <- read_sf("../data/shapefiles/carte/COMMUNE.shp")%>% 
+  st_point_on_surface()
+
+com_75=subset(comm,substr(INSEE_COM,1,2)=="75")%>%
+  st_transform("+proj=longlat +datum=WGS84")
+
+st_as_sf(com_75)%>% 
+  st_point_on_surface()%>%
+  leaflet()%>%addTiles()%>%
+  addMarkers()
+
+
+st_as_sf(iris_75)%>% 
+  st_point_on_surface()%>%
+  leaflet()%>%addTiles()%>%
+  addMarkers()
+
+
+```
+
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+lissage <- function(df, field, bandwidth, resolution, zone, out_crs = 3035) {
+  
+  if (st_crs(zone)$epsg != out_crs) {
+    message("reprojecting data...")
+    zone <- st_transform(zone, out_crs)
+  }
+  
+  if (st_crs(df)$epsg != out_crs) {
+    message("reprojecting study zone...")
+    df <- st_transform(df, out_crs)
+  }
+  
+  zone_bbox <- st_bbox(zone)
+  
+  # grid generation
+  message("generating reference grid...")
+  zone_xy <- zone %>% 
+    dplyr::select(geometry) %>% 
+    st_make_grid(cellsize = resolution,
+                 offset = c(plyr::round_any(zone_bbox[1] - bandwidth, resolution, f = floor),
+                            plyr::round_any(zone_bbox[2] - bandwidth, resolution, f = floor)),
+                 what = "centers") %>%
+    st_sf() %>% 
+    st_join(zone, join = st_intersects, left = FALSE) %>% 
+    st_coordinates() %>% 
+    as_tibble() %>% 
+    dplyr::select(x = X, y = Y)
+  
+  # kernel
+  message("computing kernel...")
+  kernel <- df %>% 
+    cbind(., st_coordinates(.)) %>%
+    st_set_geometry(NULL) %>% 
+    dplyr::select(x = X, y = Y, field) %>% 
+    btb::kernelSmoothing(dfObservations = .,
+                         sEPSG = out_crs,
+                         iCellSize = resolution,
+                         iBandwidth = bandwidth,
+                         vQuantiles = NULL,
+                         dfCentroids = zone_xy)
+  
+  # rasterization
+  message("\nrasterizing...")
+  raster::raster(xmn = plyr::round_any(zone_bbox[1] - bandwidth, resolution, f = floor),
+                 ymn = plyr::round_any(zone_bbox[2] - bandwidth, resolution, f = floor),
+                 xmx = plyr::round_any(zone_bbox[3] + bandwidth, resolution, f = ceiling),
+                 ymx = plyr::round_any(zone_bbox[4] + bandwidth, resolution, f = ceiling),
+                 resolution = resolution) %>% 
+    fasterize::fasterize(kernel, ., field = field)
+}
+```
+
+
+
+```{r}
+comm %>% 
+  lissage("POPULATION", 20000, 2000, fr, 3035) %>%
+  raster::writeRaster("pop.tif")
+```
+
+
+# Exemple du package
+
+```{r}
+######### example 1 #########
+data(dfPrix_SP95_2016)
+dfPrix_SP95_2016$nbObs <- 1L
+
+dfSmoothed <- kernelSmoothing(dfObservations = dfPrix_SP95_2016
+                              , sEPSG = "2154"
+                              , iCellSize = 5000L
+                              , iBandwidth = 30000L)
+
+
+dfSmoothed$prix95 <- dfSmoothed$SP95 / dfSmoothed$nbObs * 100
+
+```
+
+
+```{r}
+## carto non interactive
+
+library(cartography)
+choroLayer(dfSmoothed
+           , var = "prix95"
+           , nclass = 5
+           , method = "fisher-jenks"
+           , border = NA
+           , legend.title.txt = "prix du SP95 en centimes")
+```
+
+```{r}
+dfSmoothed <- st_transform(dfSmoothed, "+proj=longlat +datum=WGS84")
+
+pal <- colorQuantile(c("blue","yellow","orange","red"), NULL, n = 100)
+
+leaflet(dfSmoothed)%>%addTiles()%>%
+  addPolygons(fillOpacity = 1,opacity = 0,
+              color=~pal(prix95))
+
+```
+
+
+# IDW
+
+
+```{r}
+load(url("https://userpage.fu-berlin.de/soga/300/30100_data_sets/East_Germany.RData"))
+library(raster)
+library(gstat)
+```
+
+
+```{r}
+plot(dwd.east.sp)
+plot(east.germany.states.sp, add = TRUE, border = "red")
+```
+
+```{r}
+extent.east.germany <- extent(east.germany.states.sp)
+extent.east.germany
+```
+
+```{r}
+grid.east.germany <- expand.grid(x = seq(from = round(extent.east.germany@xmin),
+                                  to = round(extent.east.germany@xmax),
+                                  by = 10000),
+                                 y = seq(from = round(extent.east.germany@ymin),
+                                         to = round(extent.east.germany@ymax),
+                                         by = 10000))
+
+head(grid.east.germany, 10)
+
+plot(grid.east.germany)
+```
+```{r}
+coordinates(grid.east.germany) <- ~x + y
+class(grid.east.germany)
+```
+```{r}
+proj4string(grid.east.germany) <- proj4string(dwd.east.sp)
+
+proj4string(dwd.east.sp)=proj4string(grid.east.germany)
+
+grid.east.germany=spTransform(grid.east.germany,proj4string(dwd.east.sp))
+
+head(grid.east.germany)
+```
+```{r}
+gridded(grid.east.germany) <- TRUE
+class(grid.east.germany)
+```
+```{r}
+plot(grid.east.germany, 
+     main = paste("Weather Stations in East Germany\n and Interpolation Grid"),
+     col = "grey",
+     cex.main = 0.9)
+
+plot(east.germany.states.sp, add = TRUE, border = "red")
+plot(dwd.east.sp, add = TRUE, pch = 19, cex = 0.5, col = "blue")
+```
+
+
+## IDW
+
+
+```{r}
+neighbors = length(dwd.east.sp)
+beta = 2
+
+idw_temp = gstat(formula = Temperature ~ 1, # intercept only model
+                data = dwd.east.sp, 
+                nmax = neighbors, 
+                set = list(idp = beta))
+```
+
+
+```{r}
+grid.east.germany.temp <- predict(object = idw_temp,
+                                     newdata = grid.east.germany)
+```
+
+```{r}
+plot(grid.east.germany.temp,
+     main = "IDW Temperatur (°C)")
+plot(east.germany.states.sp, add = TRUE, border = "white")
+plot(dwd.east.sp, add = TRUE, pch = 19, cex = 0.5, col = "green")
+```
+
+
+```{r}
+grid.east.germany.temp <- mask(raster(grid.east.germany.temp),
+                                  east.germany.states.sp)
+```
+
+# weighted density
+
+```{r}
+
+iris_75_point_data_test=iris_75_point_data[is.na(DISP_MED18)==F]
+iris_75_point_data_test$h=1
+
+cw=kde2d.weighted(x=iris_75_point_data_test$x, 
+               y=iris_75_point_data_test$y, n = 10000, w=iris_75_point_data_test$DISP_MED18,
+               lims=c(range(iris_75_point_data_test$x),range(iris_75_point_data_test$y)))
+
+contour(x=cw$x, y=cw$y, z=cw$z, xlab="x", ylab="y", main="z")
+
+```
+
+
+
+
+
+```{r}
+
+kde2d.weighted <- function (x, y, w, h, n = n, lims = c(range(x), range(y))) {
+  nx <- length(x)
+  if (length(y) != nx) 
+      stop("data vectors must be the same length")
+  gx <- seq(lims[1], lims[2], length = n) # gridpoints x
+  gy <- seq(lims[3], lims[4], length = n) # gridpoints y
+  if (missing(h)) 
+    h <- c(bandwidth.nrd(x), bandwidth.nrd(y));
+  if (missing(w)) 
+    w <- numeric(nx)+1;
+  h <- h/4
+  ax <- outer(gx, x, "-")/h[1] # distance of each point to each grid point in x-direction
+  ay <- outer(gy, y, "-")/h[2] # distance of each point to each grid point in y-direction
+  z <- (matrix(rep(w,n), nrow=n, ncol=nx, byrow=TRUE)*matrix(dnorm(ax), n, nx)) %*% t(matrix(dnorm(ay), n, nx))/(sum(w) * h[1] * h[2]) # z is the density
+  return(list(x = gx, y = gy, z = z))
+}
+
+```
+
+
+```{r}
+x <- runif(20000,-5,5)
+y <- runif(20000,-5,5)
+z <- dnorm(x, mean=0, sd=1)*dnorm(y, mean=0, sd=1)
+
+# plot data
+# =========
+
+library(Rcmdr)
+scatter3d(x=x,z=y,y=z,surface=FALSE,xlab="x",ylab="z",zlab="y",bg.col="black")
+
+temp0 <- kde2d(x=x, y=y, n = 100, lims=c(range(x),range(y))) 
+contour(x=temp0$x, y=temp0$y, z=temp0$z, xlab="x", ylab="y", main="z")
+
+
+```
+
+```{r}
+temp <- kde2d.weighted(x=x, y=y, w=z, n = 100, lims=c(range(x),range(y))) 
+contour(x=temp$x, y=temp$y, z=temp$z, xlab="x", ylab="y", main="z", col="red", add=TRUE)
+```
+
+
+
+# Densité (forme allongée)
+
+
+```{r}
+x11=rnorm(200,0,1)
+x12=rnorm(200,2,1)
+data=data.frame(x1=c(x11,x12),
+                x2=c(x11*2,x12*10))
+
+m <- ggplot(data, aes(x = x1, y = x2)) +
+ geom_point()
+
+# contour lines
+m + geom_density_2d()
+```
+
