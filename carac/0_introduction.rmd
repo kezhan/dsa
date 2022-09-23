@@ -1,0 +1,380 @@
+
+
+# Packages
+
+## Installation de packages
+
+```{r eval=FALSE, echo=FALSE}
+
+# installation de certains packages particuliers
+install.packages("sjPlot",dependencies = T)
+install.packages("sjmisc",dependencies = T)
+update.packages("broom",dependencies = T)
+update.packages("mlr",dependencies=T)
+
+install.packages("CASdatasets", repos = "http://cas.uqam.ca/pub/R/")
+
+devtools::install_github("timelyportfolio/sunburstR")
+install.packages(c("extrafont"))
+library(extrafont)
+font_import("DejaVu Sans")
+extrafont::font_install("DejaVu Sans")
+
+install.packages("pacman")
+library(pacman)
+
+install.packages('tinytex')
+tinytex::install_tinytex()
+```
+
+```{r,eval=FALSE}
+install.packages("pacman")
+library(pacman)
+
+install.packages("copula",dependencies = T)
+
+install.packages("gsl",dependencies = T)
+# brew install gsl
+install.packages("jtools",dependencies = T)
+
+
+# pour installer gstat, il fallait supprimer sp, puis réinstaller
+
+remove.packages(c("sp","lattice","mpas"))
+
+install.packages("gstat",dependencies = T)
+
+install.packages("sp",dependencies = T)
+
+
+```
+
+## Chargement de packages
+
+```{r}
+
+pacman::p_load(ggtern,MASS,gstat,stars,raster)
+
+
+######### chargements packages #############
+pacman::p_load(rmarkdown,ggplot2,lime,microbenchmark,rmdformats,actuar,copula,
+               mvtnorm,sn,scatterplot3d,jtools,rhandsontable,ggraph,igraph,tidygraph,knitr,
+               openxlsx,vroom,tidyverse,DT,rpart,rpart.plot,caret,lme4,randomForest,ggmap,
+               flexdashboard,geojsonR,maptiles,mapsf,osrm,fuzzyjoin,RColorBrewer,reshape2,patchwork,
+               officer,mschart,flextable,ggspatial,tmap) # pour texte seul
+
+pacman::p_load(sfnetworks,tidygraph,clipr,spdep,nngeo)
+
+
+library(copula)
+library(stringr)
+library(reshape2)
+library(threejs)
+library(curl)
+library(RCurl)
+library(httr)
+library(ggmap)
+library(leaflet)
+library(htmlwidgets)
+library(jsonlite)
+library(data.table)
+library(plotly)
+
+# library(V8)
+
+library(maps)
+
+library(ggmap)
+library(rgeos)
+library(classInt)
+library(plotrix)
+library(scales)
+
+# divers
+library(digest)
+
+
+################### import des données ###################
+pacman::p_load(rmarkdown,knitr,digest,gmailr,leaflet,fontawesome,vroom,raster)
+#pacman::p_load(DBI,odbc,RMySQL, RSQLite,curl,RCurl)
+
+pacman::p_load(foreign,haven,data.table,
+               readr,readxl,tidyverse,tibble,httr,
+               openxlsx,plyr,bit64)
+
+
+################### visualisation ###################
+
+pacman::p_load(corrplot,ggplot2,
+               gridExtra,ggmap,htmlwidgets,
+               leaflet,RColorBrewer,
+               dygraphs,scales,rgeos,ggmosaic,rpart.plot,
+               leaflet.extras,pROC,
+               arulesViz,threejs,plotrix,maps,highcharter,maptools,
+               cartography,kableExtra,flexdashboard,plotly)
+
+
+################### manipulation et transformation ###################
+
+pacman::p_load(rgdal,corrplot,
+               rgdal,ggmap,rgeos,rmarkdown,
+               revealjs,DT,leaflet,data.table,dplyr,tidyr,stringr,lubridate,
+               stringdist,Hmisc,stringdist,reshape2,XML,
+               broom,tibble,
+               tidyverse,formattable,openxlsx,vroom,sf)
+
+
+###################  Reporting ###################
+
+#pacman::p_load(shiny, rmarkdown,bookdown,DT,learnr,knitr,pdftools,remedy,staplr)
+
+###################Time Série ###################
+
+pacman::p_load(hydroGOF,zoo,xts,quantmod,RcppRoll)
+
+###################Time Série ###################
+
+pacman::p_load(survival,survminer)
+
+
+################### Divers ###################
+
+pacman::p_load(parallel,Rcpp,devtools,digest)
+
+select=dplyr::select
+summarise=dplyr::summarise
+```
+
+
+```{r}
+?select
+```
+
+
+
+
+# Knit
+
+## Choix de fichier
+
+```{r}
+
+
+list.files(".",pattern=".rmd")
+list.files(".",pattern=".Rmd")
+
+files1=c("101_01_installation.Rmd",
+         "101_02_rmarkdown.Rmd",
+         "101_03_bases_R.Rmd")
+file="101_01_installation.Rmd"
+
+for (i in 1:37){
+  cat("fr",i,"\n",sep="")
+}
+
+```
+
+## Fichier individuels
+
+```{r eval=FALSE, echo=FALSE}
+
+######### type fichier #############
+
+type_document=c("html_document","html2")
+type_document=c("revealjs::revealjs_presentation","revealjs_ma")
+type_document=c("pdf_document","pdf_sanslogo")
+type_document=c("beamer_presentation","beamer")
+
+######### render fichiers #############
+
+for (file in files1[1:3]){
+  render(file,type_document[1],
+         encoding="UTF-8",
+         output_dir = type_document[2],
+         quiet = T)
+  
+}
+
+```
+
+
+# Flexdashboard
+
+
+```{r}
+file="3_heatmap_dashboard.Rmd"
+
+```
+
+## Fichier individuel
+
+```{r}
+
+file="index.Rmd"
+file="ul_stat_globales.Rmd"
+file="ul_stat_globales_vis.Rmd"
+
+file="eta_stat_globales.Rmd"
+file="eta_stat_cj.Rmd"
+file="ul_stat_cj.Rmd"
+file="test_cols.Rmd"
+file="agences_bancaires.Rmd"
+
+file="diane.Rmd"
+file="diane_sirene.Rmd"
+file="insee.Rmd"
+file="4_voies.Rmd"
+
+file="4_iris2.Rmd"
+file="4_kd2d.Rmd"
+file="4_interp.Rmd"
+
+file="5_msc.Rmd"
+file="5_graph_tr.Rmd"
+file="6_knn.Rmd"
+
+liste_files=c("4_interp.Rmd","4_kd2d.Rmd","5_graph_tr.Rmd")
+
+liste_files=c("90_fdb_idf_csp.Rmd","90_fdb_idf_logmt.Rmd","90_fdb_idf_revenu.Rmd")
+file="90_fdb_idf_logmt.Rmd"
+
+options(DT.options = list(pageLength = 100, language = list(search = "Rechercher :"),
+                          dom = 'Bfrtip',
+                          buttons = c('copy', 'csv', 'excel')))
+
+for (file in liste_files){
+  
+  render(file,"flexdashboard::flex_dashboard",
+         output_file = paste0(gsub(".Rmd","",file),".html"),
+         encoding="UTF-8",
+         output_dir = "fdb_site",
+         quiet = T,
+         output_options=list(self_contained=FALSE,
+                             lib_dir="fdb_site/site_libs"))
+  
+}
+
+
+
+```
+
+## Boucle knn pour csp
+
+```{r}
+
+cspi="ratio_csp1"
+file="6_knn.Rmd"
+varcspnames=csp_var[VAR_ID %in% paste0("C17_POP15P_CS",1:8)]$VAR_LIB
+
+for (i in 1:8){
+
+  cspi=paste0("ratio_csp",i)
+  
+  render(file,"flexdashboard::flex_dashboard",
+         output_file = paste0(gsub(".Rmd","",file),"_0_5_300_weighted_csp_",i,"_",varcspnames[i],".html"),
+       encoding="UTF-8",
+       output_dir = "../211019_msc_site_test_col",
+       quiet = T,
+       output_options=list(self_contained=FALSE,
+                           lib_dir="../211019_msc_site_test_col/site_libs"))
+  print(i)
+}
+
+```
+
+## tranches d'âge
+
+on utilise la variable pour CSP
+
+```{r}
+
+  cspi="ratio_P17_POP2539"
+  
+  render(file,"flexdashboard::flex_dashboard",
+         output_file = paste0(gsub(".Rmd","",file),"_tranche_",cspi,".html"),
+       encoding="UTF-8",
+       output_dir = "../211019_msc_site",
+       quiet = T,
+       output_options=list(self_contained=FALSE,
+                           lib_dir="../211019_msc_site/site_libs"))
+```
+
+
+## Boucle csp pour interp
+
+```{r}
+
+for (i in c(4,7)){
+  
+  csp_cible=paste0("C17_POP15P_CS",i)
+  ratio_csp_cible=paste0("ratio_csp",i)
+  
+  iris_75_csp$csp_cible=iris_75_csp[[csp_cible]]
+  iris_75_csp$ratio_csp_cible=iris_75_csp[[ratio_csp_cible]]
+  
+  render(file,"flexdashboard::flex_dashboard",
+         output_file = paste0(gsub(".Rmd","",file),"CSP_",i,".html"),
+         encoding="UTF-8",
+         output_dir = "../msc_site",
+         quiet = T,
+         output_options=list(self_contained=FALSE,
+                             lib_dir="../msc_site/site_libs"))
+  
+  print(i)
+}
+
+
+```
+
+## CJ
+
+```{r}
+
+liste_files=c("eta_stat_cj.Rmd","ul_stat_cj.Rmd")
+
+for (file in liste_files){
+  
+  cj1_i="9"
+  
+  render(file,"flexdashboard::flex_dashboard",
+       encoding="UTF-8",
+       output_file = paste0(sub(".Rmd","",file),"_",cj1_i,".html"),
+       output_dir = "../sirene_site",
+       quiet = T,
+       output_options=list(self_contained=FALSE,
+                           lib_dir="../sirene_site/site_libs"))
+}
+
+
+```
+
+
+## NAF
+
+```{r}
+
+naf5_i="6419Z"
+naf5_i="6622Z"
+naf5_liste=c("5610A","5610C","6419Z","6622Z")
+naf5_i="5610C"
+
+naf5_i="5610A"
+
+
+liste_files=c("eta_stat_naf.Rmd","ul_stat_naf.Rmd")
+
+for (naf5_i in naf5_liste){
+  for (file in liste_files){
+    # naf5_i="6419Z"
+    # naf5_i="6622Z"
+    render(file,"flexdashboard::flex_dashboard",
+           encoding="UTF-8",
+           output_file = paste0(sub(".Rmd","",file),"_",naf5_i,".html"),
+           output_dir = "../sirene_site",
+           quiet = T,
+           output_options=list(self_contained=FALSE,
+                               lib_dir="../sirene_site/site_libs"))
+  }
+}
+```
+

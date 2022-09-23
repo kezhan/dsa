@@ -1,0 +1,17 @@
+---
+title: "Analyse exploratoire"
+output: html_document
+date: '2022-08-24'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Import des données
+
+
+
+
+
+

@@ -1,0 +1,90 @@
+---
+title: "Analyse exploratoire"
+output: html_document
+date: '2022-08-24'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Import des données
+
+mono
+
+```{r}
+mono19=fread("data/Mono/PM_ALM_MonoSupport_31122019.csv",skip=2)%>%
+  mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+mono20=fread("data/Mono/PM_ALM_MonoSupport_31122020.csv",skip=2)%>%
+  mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+mono21=fread("data/Mono/PM_ALM_MonoSupport_31122021.csv",skip=2)%>%
+  mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+
+
+mono20[is.na(PM_ALM)]
+mono20[115095]
+
+mono=merge(mono19,mono20,by="NoPolice")
+
+names(mono19)==
+names(mono20)
+
+dim(mono19)
+dim(mono20)
+
+
+
+```
+
+
+```{r}
+multi20=fread("data/Multi/PM_ALM_Multisupports_31122020.csv",skip=3)
+
+
+r19=fread("data/Rente/PM_ALM_RMC_Reserve_31122019.csv",skip=2)
+
+ggplot(r19,aes(Provision_autre_risque,Capital_Garanti))+geom_point()
+
+
+```
+
+Année de naissance
+
+min trop faible
+
+```{r}
+min(mono20$AnneeNaissanceAssure)
+max(mono20$AnneeNaissanceAssure)
+```
+
+NoPolice ne correspond pas, donc on ne peut pas étudier l'évolution
+
+```{r}
+mono20[115098]
+mono19[115098]
+
+mono19[,.N,by=TypeDePolice]
+
+
+mono19[,.N,by=TauxChargementSurEncours]
+```
+
+
+```{r}
+mono20$PM_ALM
+
+ggplot(mono20,aes(AnneeNaissanceAssure,PM_ALM,color=as.factor(SexeAssure)))+geom_point()
+
+plot(mono20$PM_ALM,mono20$AnneeNaissanceAssure)
+```
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
