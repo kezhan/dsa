@@ -1,0 +1,206 @@
+---
+title: "ACP des données démographiques"
+always_allow_html: yes
+---
+
+```{r, child="_setup.Rmd"}
+```
+
+```{r, eval=F,include=F}
+pacman::p_load(tidyverse,data.table,openxlsx,PCA)
+
+```
+
+
+https://programmathically.com/understanding-hinge-loss-and-the-svm-cost-function/
+
+
+# Données
+
+Question:
+
+- Utiliser `fread` pour importer les données
+- Explorer les données avec les fonctions de base: `str`, `summary`
+
+```{r}
+
+data=read.xlsx("data/base_cc_comparateur.xlsx",startRow = 6)%>%data.table()
+
+# df <- read_excel("../data/insee/excel/base-cc-carac-emploi-2015.xls",sheet = "COM_2015",skip=5)
+
+data=fread("data/base_cc_comparateur.csv",encoding = "UTF-8")
+
+names(data)
+
+```
+
+Le descriptif des variables 
+
+
+```{r}
+var=fread("data/meta_base_cc_comparateur.csv",encoding = "UTF-8")
+
+```
+
+# Catégories professionnelles
+
+
+
+```{r}
+data[,c("ETAZ19", "ETBE19", "ETFZ19", "ETGU19", "ETGZ19", "ETOQ19", "ETTEF119", 
+        "ETTEFP1019")]=data[,c("ETAZ19", 
+                               "ETBE19", "ETFZ19", "ETGU19", "ETGZ19", "ETOQ19", "ETTEF119", 
+                               "ETTEFP1019")]/data$ETTOT19
+
+
+df=data[P19_POP>6000,c("CODGEO","LIBGEO","ETAZ19", "ETBE19", "ETFZ19", "ETGU19", "ETGZ19", "ETOQ19", "ETTEF119", 
+        "ETTEFP1019")]
+
+names(df)=c("agriculture","industrie","construction","commerce","réparat auto","adm","PE","GE")
+dfacp=df
+
+# Boulogne Billancourt
+ref=df[CODGEO=="92012"]
+
+data$diff=rowSums((data[,c("ETAZ19", "ETBE19", "ETFZ19", "ETGU19", 
+                      "ETGZ19", "ETOQ19", "ETTEF119", 
+                      "ETTEFP1019")]-ref[rep(1,nrow(data)),c("ETAZ19", "ETBE19", "ETFZ19", "ETGU19", "ETGZ19", "ETOQ19", "ETTEF119", 
+                                            "ETTEFP1019")])^2,na.rm = T)
+
+data[P19_POP>1000 & diff>0,c("CODGEO","LIBGEO","diff")][order(diff)][1:10]%>%write.xlsx("output/diff_Boulogne.xlsx")
+
+
+data[P19_POP>30000 & diff>0,][order(-diff)][1:10]%>%write.xlsx("output/Boulogne_très différents.xlsx")
+
+```
+
+
+```{r}
+data[P19_POP>1000 & diff>0 & CODGEO %in% c("95018","92035","93066"),
+     c("CODGEO","LIBGEO","diff")][order(diff)]%>%write.xlsx("output/Boulogne_compare.xlsx")
+```
+
+```{r}
+hist(data$MED19)
+
+```
+
+
+```{r}
+code1="92049"
+code2="95018"
+
+diff=function(code1,code2){
+  diff=rowSums((data[CODGEO==code1,c("ETAZ19", "ETBE19", "ETFZ19", "ETGU19", 
+                      "ETGZ19", "ETOQ19", "ETTEF119", 
+                      "ETTEFP1019")]-data[CODGEO==code2,c("ETAZ19", "ETBE19", "ETFZ19", "ETGU19", "ETGZ19", "ETOQ19", "ETTEF119", 
+                                            "ETTEFP1019")])^2,na.rm = T)
+  return(diff)
+}
+
+# argenteuil 95018
+# montrouge 92049
+diff("95018","92049")
+data.table(CODGEO1=c("95018",""))
+
+
+```
+
+```{r}
+# 92012 boulogne
+# 92049 montrouge
+diff("92012","92049")
+```
+
+
+```{r}
+# 92035 la garenne colombe
+
+diff("92012","92035")
+
+
+```
+
+Question
+
+- Utiliser `cor` pour calculer la matrice de corrélation des différentes variables d'intérêt.
+- Comprendre le message si la fonction retourne une erreur. voir le paramètre `use` dans l'aide.
+- Choisir et tester les différentes possibilités pour `use`: `everything`, `all.obs`, `pairwise.complete.obs`.
+- Tester plusieurs méthodes de calcul de corrélation.
+
+```{r}
+
+corrplot(cor(dfacp,use="pairwise.complete.obs"))
+
+```
+
+
+# Nettoyage des données
+
+
+# Analyse en composante principales
+
+L'analyse en composantes principales permet de construire des dimensions qui concentrent le maximum d'information.
+
+Question: 
+
+- Utiliser la fonction `PCA` pour réaliser l'ACP.
+- Explorer les différents paramètres dans la fonction.
+
+```{r, echo=FALSE}
+
+ACP = PCA(dfacp, scale.unit = TRUE, graph = FALSE)
+
+
+```
+
+
+Questions:
+
+- Visualiser les pourcentages des variances expliquées en fonction des composantes à l'aide de la fonction `fviz_eig()`
+
+```{r}
+fviz_eig(ACP)
+```
+
+
+## Projection des eaux du robinet sur l'espace des eaux minéraux {-}
+
+```{r, echo=FALSE}
+library(scatterD3)
+
+affiche <- dfacp
+
+affiche[,"X1"] <-  c(ACP$ind$coord[,1], ACP$ind.sup$coord[,1])
+affiche[,"X2"] <-  c(ACP$ind$coord[,2], ACP$ind.sup$coord[,2])
+
+
+affiche$Représentabilité <- c(ACP[["ind"]][["cos2"]][,1]+ ACP[["ind"]][["cos2"]][,2],
+                              ACP$ind.sup$cos2[,1]+ACP$ind.sup$cos2[,2])
+affiche$Nom  <- dff$LIBGEO
+affiche$Pop  <- dff$P14_POP
+
+
+
+scatterD3(data = affiche[order(-Pop)][2:100,], x = X1 , y = X2  , width = "100%" , 
+          size_var = Pop, 
+          size_range = c(10,1000),
+          opacity = Représentabilité, lab = Nom ,xlab = 'Dim1' ,ylab = 'Dim2', labels_size = 15)
+
+```
+
+
+
+```{r, echo=FALSE}
+fviz_pca_var(ACP,
+             col.var = "contrib", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     
+             )
+```
+
+
+
+
+
+

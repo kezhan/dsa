@@ -1,0 +1,573 @@
+---
+title: "Packpages, paramètres et render"
+---
+
+https://cran.r-project.org/web/packages/jtools/vignettes/summ.html
+
+
+```{r setup_global}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE,eval = FALSE)
+```
+
+# Packages
+
+## Installation de packages
+
+```{r eval=FALSE, echo=FALSE}
+
+# installation de certains packages particuliers
+install.packages("sjPlot",dependencies = T)
+install.packages("sjmisc",dependencies = T)
+update.packages("broom",dependencies = T)
+update.packages("mlr",dependencies=T)
+
+install.packages("CASdatasets", repos = "http://cas.uqam.ca/pub/R/")
+
+devtools::install_github("timelyportfolio/sunburstR")
+install.packages(c("extrafont"))
+library(extrafont)
+font_import("DejaVu Sans")
+extrafont::font_install("DejaVu Sans")
+
+install.packages("pacman")
+library(pacman)
+
+install.packages('tinytex')
+tinytex::install_tinytex()
+```
+```{r,eval=FALSE}
+install.packages("pacman")
+library(pacman)
+
+install.packages("copula",dependencies = T)
+
+install.packages("gsl",dependencies = T)
+# brew install gsl
+install.packages("jtools",dependencies = T)
+
+
+```
+
+## Chargement de packages
+
+```{r}
+
+######### chargements packages #############
+
+pacman::p_load(rmarkdown,ggplot2,lime,microbenchmark,rmdformats,actuar,copula,
+               mvtnorm,sn,scatterplot3d,jtools,rhandsontable,ggraph,igraph,tidygraph,knitr,FNN) # pour texte seul
+library(copula)
+
+pacman::p_load(rgdal,learnr,skimr,ggvis,googleVis,corrplot,
+               PerformanceAnalytics,rgdal,ggmap,rgeos,rmarkdown,
+               revealjs,DT,leaflet,data.table,
+               leaflet.extras,plotly,caret,rpart,ggplot2,ipred,randomForest,
+               rpart.plot,class,e1071,neuralnet,nnet,devtools,
+               xgboost,AUC,hydroGOF,gbm,parallel,readr,RColorBrewer,gridExtra,
+               rpart,psych,rmarkdown, rpart.plot,corrplot,DT,
+               BBmisc,ParamHelpers,kernlab,ranger,irace,cmaes,
+               GenSA,XML,mlr,MASS,arules,
+               arulesViz,sjPlot,sjmisc,pROC,readxl,tidyverse,
+               broom,staplr,Hmisc,GGally,
+               insuranceData,dummies,fastDummies,treemap,ggmosaic,
+               ChainLadder,tree,cowplot,factoextra,FactoMineR,scales,tibble,
+               data.table,scatterD3,rmarkdown,corrplot,
+               tidyverse,data.table,corrplot,arules,
+               pdftools,tesseract,magick,data.table,DT,
+               stringdist,knitr,rmarkdown,remedy)
+
+pacman::p_load(caret,Ecdat,forecast,evir,VGAM,highcharter,formattable,
+               maptools,cartography)
+pacman::p_load(rmarkdown)
+pacman::p_load("rgeos",rgdal,learnr,skimr,ggvis,googleVis,corrplot,# sdfsf
+               PerformanceAnalytics,rgdal,ggmap,rgeos,rmarkdown,
+               revealjs,DT,leaflet,data.table,
+               leaflet.extras,plotly,caret,rpart,ggplot2,ipred,randomForest,
+               rpart.plot,class,e1071,neuralnet,nnet,devtools,
+               xgboost,AUC,hydroGOF,gbm,parallel,readr,RColorBrewer,gridExtra,
+               rpart,psych,rmarkdown, rpart.plot,corrplot,DT,
+               BBmisc,ParamHelpers,kernlab,ranger,irace,cmaes,GenSA,XML,mlr,MASS,arules,
+               arulesViz,sjPlot,sjmisc,pROC,readxl,tidyverse,broom,staplr,Hmisc,
+               insuranceData,dummies,fastDummies,treemap,ggmosaic)
+
+
+library(stringr)
+library(reshape2)
+library(threejs)
+library(curl)
+library(RCurl)
+library(httr)
+library(ggmap)
+library(leaflet)
+library(htmlwidgets)
+library(jsonlite)
+library(data.table)
+library(plotly)
+# library(V8)
+
+library(maps)
+
+library(ggmap)
+library(rgeos)
+library(classInt)
+library(plotrix)
+library(scales)
+
+
+# divers
+library(digest)
+R.Version()
+
+
+```
+
+# Paramètres et configuration
+
+```{r eval=FALSE, echo=FALSE}
+
+# vpn pour réseau d'entrprise
+
+set_config(use_proxy(url="ehttp2.groupe.ad.agf.fr",port=80,
+                     username="",
+                     password=""))
+
+
+
+```
+
+## path
+
+```{r eval=FALSE, echo=FALSE}
+
+# paramètre d'affichage du code pour les fichiers qui ont _setup.Rmd
+echov=TRUE
+
+options(digits=3)
+getOption("digits")
+
+######### image path #############
+
+# quand pdf, utiliser lien en local
+# lien image sur mac
+path.images="/Users/kezhanshi/Dropbox/Repos_sites/kezhanshi.bitbucket.io/images/"
+path.images="/Users/kezhanshi/Dropbox/Repos_sites/kezhanshi.bitbucket.io/images/"
+
+
+# lien images sur pc dell
+path.images="C:/Users/shike/Dropbox/Repos_sites/kezhanshi.bitbucket.io/images/"
+
+# lien site, ok pour html
+
+path.images="https://kezhanshi.bitbucket.io/images/"
+
+
+######### data.path #############
+
+data.path="../../DS/"
+
+data.path="../"
+
+# quand pdf, utiliser lien en local
+
+
+data.path="/Users/kezhanshi/Dropbox/Repos_sites/dataks.bitbucket.io/"
+
+data.path="C:/Users/shike/Dropbox/Repos_sites/dataks.bitbucket.io/"
+
+
+site=FALSE
+
+```
+
+# Knit
+
+## Choix de fichier
+
+```{r}
+
+######### choix fichiers #############
+
+file="102_01_intro.Rmd"
+file="106_11_string_base.Rmd"
+file="102_06_recaptcha.Rmd"
+file="201_32_acp.Rmd"
+file="201_31_classification.Rmd"
+
+file="100_intro_data_science.Rmd"
+file="100_10_buzzwords.Rmd"
+
+file="102_02_cas.Rmd"
+file="102_02_cas_btp.Rmd"
+file="102_03_buzzwords.Rmd"
+
+file="102_00_ds_assurance.Rmd"
+file="207_data_quality.Rmd"
+
+file="102_05_assurance.Rmd"
+file="102_13_stat.Rmd"
+file="102_31_classification.Rmd"
+file="102_21_regression.rmd"
+
+
+list.files(".",pattern=".rmd")
+list.files(".",pattern=".Rmd")
+
+files1=c("101_01_installation.Rmd",
+                         "101_02_rmarkdown.Rmd",
+                         "101_03_bases_R.Rmd")
+file="101_01_installation.Rmd"
+
+for (i in 1:37){
+  cat("fr",i,"\n",sep="")
+}
+
+```
+
+## Fichier individuels
+
+```{r eval=FALSE, echo=FALSE}
+
+file="102_15_dt.Rmd"
+file="102_14_vis_avance.Rmd"
+
+######### type fichier #############
+
+type_document=c("html_document","html2")
+type_document=c("revealjs::revealjs_presentation","revealjs_ma")
+type_document=c("pdf_document","pdf_sanslogo")
+type_document=c("beamer_presentation","beamer")
+
+######### render fichiers #############
+
+for (file in files1[1:3]){
+  render(file,type_document[1],
+         encoding="UTF-8",
+         output_dir = type_document[2],
+         quiet = T)
+  
+}
+
+```
+
+## fonction render
+
+```{r}
+######### Site #############
+
+fprefix=""
+fsuffix=""
+
+# pour esilv
+
+fprefix=""
+fsuffix="_enonce"
+echov=FALSE
+
+fsuffix="_correction"
+echov=TRUE
+
+# avec crypto
+
+render_crypto=function(file,fprefix,fsuffix,echov){
+  echo=echov
+  render(file,"html_document",
+         output_file = paste0(fprefix,substr(file,1,(nchar(file)-4)),
+                              fsuffix,"_",
+                              substr(digest(paste0(file,fsuffix), "md5", serialize = FALSE),4,12),
+                              ".html"),
+         encoding="UTF-8",
+         output_dir = "html_site",
+         quiet = F,
+         output_options=list(self_contained=FALSE,
+                             lib_dir="html_site/site_libs"))
+}
+
+digest("p")
+# sans crypto
+
+render_site_html=function(file,fprefix,fsuffix,echov){
+  echo=echov
+  render(file,"html_document",
+         output_file = paste0(fprefix,substr(file,1,(nchar(file)-4)),fsuffix,".html"),
+         encoding="UTF-8",
+         output_dir = "html_site",
+         quiet = T,
+         output_options=list(self_contained=FALSE,
+                             lib_dir="html_site/site_libs"))}
+
+
+render_site_html=function(file,fprefix,fsuffix,echov){
+  echo=echov
+  render(file,"rmdformats::readthedown",
+         output_file = paste0(fprefix,substr(file,1,(nchar(file)-4)),fsuffix,".html"),
+         encoding="UTF-8",
+         output_dir = "html_site",
+         quiet = T,
+         output_options=list(self_contained=FALSE,
+                             lib_dir="html_site/site_libs"))}
+
+
+```
+
+```{r}
+file="esilv_2020.Rmd"
+
+render_site_html(file,"","",TRUE)
+
+```
+
+## Site
+
+```{r eval=FALSE, echo=FALSE}
+
+######### choix fichiers #############
+
+file="102_72_fitdist.Rmd"
+
+file="401_10_webscraping.Rmd"
+file="401_12_webscraping_leboncoin.Rmd"
+file="401_11_xpath.Rmd"
+file="401_13_selenium.rmd"
+
+file="401_20_nettoyage.rmd"
+
+file="401_31_ggplot.rmd"
+file="401_32_vis_immo.rmd"
+file="401_35_carto.rmd"
+
+file="401_40_ratios.rmd"
+file="130_31_ocr_cni.Rmd"
+
+file="102_13_stat.Rmd"
+file="102_21_regression.Rmd"
+file="102_31_classification.Rmd"
+file="102_32_construction_arbre_graves.Rmd"
+
+file="102_83_ts_ano.Rmd"
+
+
+file="102_51_acp.Rmd"
+
+
+files1=c(
+  "102_21_regression.Rmd",
+  "102_31_classification.Rmd",
+  "102_32_construction_arbre_graves.Rmd"
+)
+
+file="102_12_vis_exploration_regression.Rmd"
+file="101_03_bases_R.Rmd"
+file="102_13_stat.Rmd"
+file="101_01_installation.Rmd"
+file="102_72_fitdist_1_pres.Rmd"
+file="102_72_fitdist_exo.Rmd"
+
+for (file in files1[1:2]){
+  render_crypto(file,"","_enonce",F)
+  render_crypto(file,"","_correction",T)
+}
+
+list.files(".",pattern = ".Rmd")
+
+render_crypto(file,"","_enonce",F)
+render_crypto(file,"","_correction",T)
+render_crypto(file,"","_presentation",F)
+
+```
+
+## Flexdashboard
+
+```{r}
+
+
+file="102_12_fdb_regression.Rmd"
+
+render(file,"flexdashboard::flex_dashboard",
+       encoding="UTF-8",
+       output_dir = "fdb_site",
+       quiet = T,
+       output_options=list(self_contained=FALSE,
+                           lib_dir="fdb_site/site_libs"))
+
+
+
+```
+
+
+
+# PDF merge
+
+## DS assurance
+
+<!--
+
+- buzzwords (notamment pour présenter principe de machine learning)
+- cas pratiques: 
+    - visualisation
+    - régression et classification
+- cas généraux en assurance
+- cas btp
+- processus global en data science
+- cas web scraping pour capter les données
+- résiliation
+
+-->
+
+```{r}
+# pour mai 2019
+
+staple_pdf(input_files=c("pdf/102_00_ds_assurance.pdf",
+                         "pdf/102_02_cas_btp.pdf",
+                         "pdf/102_13_stat.pdf",
+                         "pdf/102_21_regression.pdf",
+                         "pdf/102_31_classification.pdf",
+                         "pdf/102_32_construction_arbre_graves.pdf",
+                         "pdf/102_41_arules.pdf",
+                         "pdf/102_51_acp.pdf"),
+           output_file="pdf/DS_Assurance_201905.pdf")
+
+
+staple_pdf(input_files=c("pdf/102_00_ds_assurance.pdf",
+                         "pdf/102_02_cas_btp.pdf",
+                         "pdf/102_21_regression.pdf",
+                         "pdf/102_31_classification.pdf",
+                         "pdf/102_51_acp.pdf"),
+           output_file="pdf/DS_Assurance_201908_1j.pdf")
+
+
+```
+
+```{r eval=FALSE, echo=FALSE}
+
+######### merge pdf #############
+
+list.files("pdf")
+
+# avis clients, visualisation zones inondation
+
+staple_pdf(input_files=c("pdf/102_00_ds_assurance.pdf",
+                         "pdf/102_02_cas_btp.pdf",
+                         "../101-intro/pdf/101_01_installation.pdf",
+                         "../101-intro/pdf/101_02_rmarkdown.pdf",
+                         "../101-intro/pdf/101_03_bases_R.pdf",
+                         "pdf/102_13_stat.pdf",
+                         "pdf/102_12_vis_exploration.pdf",
+                         "pdf/102_21_regression.pdf",
+                         "pdf/102_23_regression_anomalies.pdf",
+                         "pdf/102_24_classification.pdf",
+                         "pdf/102_27_arules.pdf",
+                         "pdf/102_51_acp.pdf",
+                         "../305-webscraping/pdf/26_ad_hippo.pdf",
+                         "../305-webscraping/pdf/50_rselenium.pdf",
+                         "../130-rpa/pdf/130_21_adresses.pdf",
+                         "../130-rpa/pdf/130_31_ocr_cni.pdf"),
+           output_file="pdf/DS_Assurance_20181130.pdf")
+
+# présentation 2 heures (à faire)
+staple_pdf(input_files=c("pdf/201_00_intro.pdf",
+                         "../102-ds-assurance/pdf/102_02_cas_btp.pdf"),
+           output_file="pdf/fraude_2h.pdf")
+
+```
+
+## Qualité des données
+
+```{r}
+
+
+list.files("pdf")
+list.files(".")
+
+# présentation formation 1 jour pour argus
+staple_pdf(input_files=c("pdf/page garde début data quality.pdf",
+                         "pdf/207_data_quality.pdf",
+                         "pdf/page garde fin.pdf"),
+           output_file="pdf/argus_2019_qdd2.pdf")
+
+
+
+```
+
+## text mining et NLP
+
+
+```{r}
+
+```
+
+## Data science pour les nuls avec R
+
+```{r}
+list.files("../106-nlp/pdf")
+list.files("pdf")
+
+# avis clients, visualisation zones inondation
+
+staple_pdf(input_files=c("pdf/101_01_installation.pdf",
+                         "pdf/101_02_rmarkdown.pdf",
+                         "pdf/101_03_bases_R.pdf",
+                         "pdf/102_13_stat.pdf",
+                         "pdf/102_12_vis_exploration_classification.pdf",
+                         "pdf/102_12_vis_exploration_regression.pdf",
+                         "pdf/102_21_regression.pdf",
+                         "pdf/102_23_regression_anomalies.pdf",
+                         "pdf/102_31_classification.pdf",
+                         "pdf/102_41_arules.pdf",
+                         "pdf/102_51_acp.pdf",
+                         "../106-nlp/pdf/106_11_string_base.pdf",
+                         "../106-nlp/pdf/106_12_distance_type.pdf",
+                         "../106-nlp/pdf/106_13_regex_base.pdf",
+                         "../106-nlp/pdf/106_19_geocodeur_exo.pdf",
+                         "../305-webscraping/pdf/26_ad_hippo.pdf",
+                         "../305-webscraping/pdf/50_rselenium.pdf"),
+           output_file="pdf/DS_R_201909.pdf")
+```
+
+## Data science pour manager
+
+
+```{r}
+
+staple_pdf(input_files=c("pdf/102_00_ds_assurance.pdf",
+                         "pdf/102_02_cas_btp.pdf",
+                         "pdf/102_13_stat.pdf",
+                         "pdf/102_21_regression.pdf",
+                         "pdf/102_31_classification.pdf",
+                         "pdf/102_32_construction_arbre_graves.pdf",
+                         "pdf/102_41_arules.pdf",
+                         "pdf/102_51_acp.pdf"),
+           output_file="pdf/DS_Assurance_manager_2019.pdf")
+```
+
+
+## Argus uniformation
+
+
+```{r}
+list.files("pdf_sanslogo")
+staple_pdf(input_files=c("pdf_sanslogo/page garde uniformation.pdf",
+                         "pdf_sanslogo/100_10_buzzwords.pdf",# vient du dossier intro pres
+                         "pdf_sanslogo/102_05_assurance.pdf",
+                         "pdf_sanslogo/102_13_stat.pdf",
+                         "pdf_sanslogo/102_21_regression.pdf",
+                         "pdf_sanslogo/102_31_classification.pdf",
+                         "pdf_sanslogo/102_02_cas_btp.pdf",
+                         "pdf_sanslogo/106_19_geocodeur_exo.pdf",
+                         "pdf_sanslogo/page garde fin.pdf"),
+           output_file="pdf_sanslogo/DS_Assurance_argus_uniformation_2019.pdf")
+```
+
+
+## Maroc
+
+```{r}
+list.files("pdf_sanslogo")
+staple_pdf(input_files=c("pdf_sanslogo/100_10_buzzwords.pdf",# vient du dossier intro pres
+                         "pdf_sanslogo/102_05_assurance.pdf",
+                         "pdf_sanslogo/102_13_stat.pdf",
+                         "pdf_sanslogo/102_21_regression.pdf",
+                         "pdf_sanslogo/102_31_classification.pdf",
+                         "pdf_sanslogo/102_02_cas_btp.pdf",
+                         "pdf_sanslogo/106_19_geocodeur_exo.pdf"),
+           output_file="pdf_sanslogo/DS_Assurance_maroc.pdf")
+```
