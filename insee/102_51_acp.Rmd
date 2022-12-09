@@ -17,18 +17,23 @@ https://programmathically.com/understanding-hinge-loss-and-the-svm-cost-function
 
 # Données
 
+
+## import des données
+
 Question:
 
 - Utiliser `fread` pour importer les données
 - Explorer les données avec les fonctions de base: `str`, `summary`
 
 ```{r}
-
 data=read.xlsx("data/base_cc_comparateur.xlsx",startRow = 6)%>%data.table()
+```
 
+
+```{r}
 # df <- read_excel("../data/insee/excel/base-cc-carac-emploi-2015.xls",sheet = "COM_2015",skip=5)
 
-data=fread("data/base_cc_comparateur.csv",encoding = "UTF-8")
+data_base=fread("data/base_cc_comparateur.csv",encoding = "UTF-8")
 
 names(data)
 
@@ -42,8 +47,73 @@ var=fread("data/meta_base_cc_comparateur.csv",encoding = "UTF-8")
 
 ```
 
-# Catégories professionnelles
 
+```{r}
+
+data=var[COD_VAR=="CODGEO",c("COD_MOD","LIB_MOD")]%>%
+  merge(data_base,by.x="COD_MOD",by.y="CODGEO")
+
+```
+
+## Filtres
+
+```{r}
+data=data[is.na(TP6019)==F]
+data=data[P19_POP>1000 & P19_POP <500000]
+data$densite_pop=data$P19_POP/data$SUPERF
+```
+
+```{r}
+dput(names(data))
+
+data_norm <- data %>% mutate_at(c("P19_POP", "P13_POP", "SUPERF", "NAIS1319", 
+                                  "DECE1319", "P19_MEN", "NAISD21", "DECESD21", "P19_LOG", "P19_RP", 
+                                  "P19_RSECOCC", "P19_LOGVAC", "P19_RP_PROP", "NBMENFISC19", "PIMP19", 
+                                  "MED19", "TP6019", "P19_EMPLT", "P19_EMPLT_SAL", "P13_EMPLT", 
+                                  "P19_POP1564", "P19_CHOMEUR1564", "P19_ACT1564", "ETTOT19", "ETAZ19", 
+                                  "ETBE19", "ETFZ19", "ETGU19", "ETGZ19", "ETOQ19", "ETTEF119", 
+                                  "ETTEFP1019", "densite_pop"), ~(scale(.) %>% as.vector))
+```
+
+## Exploration
+
+
+```{r}
+data[order(-P19_POP)]
+data[order(P19_POP)]
+
+
+data[order(ETTOT19)]
+data[order(-ETTOT19)]
+
+summary(data)
+
+```
+
+```{r}
+data[is.na(TP6019)][order(-P19_POP)]
+
+```
+
+
+```{r}
+data[order(densite_pop)]
+hist(data$P19_POP,nclass=100)
+
+hist(data$ETTOT19,nclass=100)
+
+```
+
+
+```{r}
+# synthèse des filtres
+
+
+
+```
+
+
+## Nettoyage
 
 
 ```{r}
@@ -56,9 +126,88 @@ data[,c("ETAZ19", "ETBE19", "ETFZ19", "ETGU19", "ETGZ19", "ETOQ19", "ETTEF119",
 df=data[P19_POP>6000,c("CODGEO","LIBGEO","ETAZ19", "ETBE19", "ETFZ19", "ETGU19", "ETGZ19", "ETOQ19", "ETTEF119", 
         "ETTEFP1019")]
 
-names(df)=c("agriculture","industrie","construction","commerce","réparat auto","adm","PE","GE")
-dfacp=df
 
+dfacp=df[,-c("LIBGEO","CODGEO")]
+names(dfacp)=c("agriculture","industrie","construction","commerce","réparat auto","adm","PE","GE")
+
+```
+
+## Exploration
+
+```{r}
+
+hist(data$MED19)
+
+```
+
+
+```{r}
+data$P19_RP
+
+hist(data$P19_RP)
+
+datatable(data)
+```
+
+
+
+
+# Comparaisons simples
+
+## Cosine
+
+```{r}
+M <- as.matrix(data_norm[,-c("COD_MOD","LIB_MOD","SUPERF","P19_POP","P13_POP","SUPERF","P19_MEN")])
+v <- as.vector(as.matrix(data_norm[COD_MOD=="92012",-c("COD_MOD","LIB_MOD","SUPERF","P19_POP","P13_POP","SUPERF","P19_MEN")]))
+
+data$cosine=( M %*% v ) / sqrt( sum(v*v) * rowSums(M*M) )
+
+data[order(cosine)]
+data[order(-cosine)]
+
+```
+
+## Distance euclidienne
+
+```{r}
+dput(names(data))
+```
+
+```{r}
+
+
+
+M <- as.matrix(data_norm[,c("ETTOT19", "ETAZ19", 
+                            "ETBE19", "ETFZ19", "ETGU19", "ETGZ19", "ETOQ19", "ETTEF119", 
+                            "ETTEFP1019", "densite_pop")])
+v <- as.vector(as.matrix(data_norm[COD_MOD=="92012",c("ETTOT19", "ETAZ19", 
+                            "ETBE19", "ETFZ19", "ETGU19", "ETGZ19", "ETOQ19", "ETTEF119", 
+                            "ETTEFP1019", "densite_pop")]))
+
+data$cosine=( M %*% v ) / sqrt( sum(v*v) * rowSums(M*M) )
+
+data[order(cosine)]
+data[order(-cosine)]
+
+
+```
+
+
+```{r}
+
+
+
+data$distance=rowSums(sweep(M, 2, v)^2)
+data[order(distance)]
+data[order(-distance)]
+
+
+```
+
+### Autres
+
+
+```{r}
 # Boulogne Billancourt
 ref=df[CODGEO=="92012"]
 
@@ -78,11 +227,6 @@ data[P19_POP>30000 & diff>0,][order(-diff)][1:10]%>%write.xlsx("output/Boulogne_
 ```{r}
 data[P19_POP>1000 & diff>0 & CODGEO %in% c("95018","92035","93066"),
      c("CODGEO","LIBGEO","diff")][order(diff)]%>%write.xlsx("output/Boulogne_compare.xlsx")
-```
-
-```{r}
-hist(data$MED19)
-
 ```
 
 
@@ -121,6 +265,11 @@ diff("92012","92035")
 
 ```
 
+# ACP
+
+## Corrélation
+
+
 Question
 
 - Utiliser `cor` pour calculer la matrice de corrélation des différentes variables d'intérêt.
@@ -135,10 +284,8 @@ corrplot(cor(dfacp,use="pairwise.complete.obs"))
 ```
 
 
-# Nettoyage des données
 
-
-# Analyse en composante principales
+## Analyse en composante principales
 
 L'analyse en composantes principales permet de construire des dimensions qui concentrent le maximum d'information.
 
@@ -177,11 +324,19 @@ affiche[,"X2"] <-  c(ACP$ind$coord[,2], ACP$ind.sup$coord[,2])
 
 affiche$Représentabilité <- c(ACP[["ind"]][["cos2"]][,1]+ ACP[["ind"]][["cos2"]][,2],
                               ACP$ind.sup$cos2[,1]+ACP$ind.sup$cos2[,2])
-affiche$Nom  <- dff$LIBGEO
-affiche$Pop  <- dff$P14_POP
+affiche$Nom  <- df$LIBGEO
+affiche$Pop  <- df$P14_POP
+```
 
 
+```{r}
+scatterD3(data = affiche, x = X1 , y = X2  , width = "100%" , 
+          size_range = c(10,1000),
+          opacity = Représentabilité, lab = Nom ,xlab = 'Dim1' ,ylab = 'Dim2', labels_size = 15)
+```
 
+
+```{r, echo=FALSE}
 scatterD3(data = affiche[order(-Pop)][2:100,], x = X1 , y = X2  , width = "100%" , 
           size_var = Pop, 
           size_range = c(10,1000),
