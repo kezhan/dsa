@@ -14,4 +14,42 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 
+```{r}
+mono19[,.N,by=Matricule]
+
+mono19$taux2020=mono19$Valeur.2020/mono19$Valeur.2019-1
+
+hist(mono19[CODE=="R0005"]$taux2020)
+
+
+
+sal=mono19[CODE %in% c("T0004","R0005"),c("Matricule","Genre","CODE","Début","Fin","Date.de.Naissance","Grille","Valeur.2019")]%>%
+  pivot_wider(names_from = "CODE",values_from ="Valeur.2019")%>%
+  mutate(sal_hor=R0005/T0004)%>%
+  filter(is.na(sal_hor)==F)%>%
+  data.table()
+
+hist(sal$sal_hor,nclass=100)
+
+sal[,.N,by="Grille"]
+
+ggplot(sal,aes(Date.de.Naissance,sal_hor,color=as.factor(Genre)))+ geom_point()
+ggplot(sal,aes(Date.de.Naissance,sal_hor,color=as.factor(Grille)))+ geom_point()
+
+min(sal$sal_hor)
+
+mono19[CODE %in% c("T0004","R0005"),c("Matricule","Genre","CODE","Valeur.2019")][,.N,by=Matricule]
+
+mono19[CODE %in% c("T0004","R0005") & Matricule=="65",c("Matricule","Genre","CODE","Valeur.2019")]
+
+
+
+mono19[ CODE %in% c("T0004","R0005") &Matricule=="65",]
+
+unique(mono19)
+
+
+
+```
+
 

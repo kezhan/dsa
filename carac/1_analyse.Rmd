@@ -1,27 +1,30 @@
 ---
-title: "Analyse exploratoire"
-output: html_document
+title: "Analyse des fichiers"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
 date: '2022-08-24'
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
-# Import des données
 
 ```{r,eval=FALSE}
-pacman::p_load(data.table,tidyverse)
-
+pacman::p_load(data.table,tidyverse,rmarkdown,outliers,dbscan)
+library(stats)
+library(graphics)
 type_document=c("html_document","html2")
 type_document=c("revealjs::revealjs_presentation","revealjs_ma")
-type_document=c("pdf_document","pdf_sanslogo")
+type_document=c("pdf_document","pdf")
 type_document=c("beamer_presentation","beamer")
 
 ######### render fichiers #############
 
 for (file in files1[1:3]){
-  render(file,type_document[1],
+  render("1_analyse.Rmd",type_document[1],
          encoding="UTF-8",
          output_dir = type_document[2],
          quiet = T)
@@ -31,31 +34,95 @@ for (file in files1[1:3]){
 
 ```
 
-mono
+# Programme
+
+- Apprendre à utiliser R et créer un tableau de bord
+- Appliquer des règles déterministes pour trouver des écarts à étudier
+- Détection d'anomalies de manière simple avec une variable
+- Détection d'anomalies avec des variables multiples (plusieurs méthodes voir illustration)
+- Prédiction pour une variable d'intérêt
+
+# Import des données
+
+## Fichiers mono
+
+On peut créer une boucle pour importer les fichier efficacement.
 
 ```{r}
+
+
 mono19=fread("data/Mono/PM_ALM_MonoSupport_31122019.csv",skip=2)%>%
   mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+ # names(mono19) = names_mono
 mono20=fread("data/Mono/PM_ALM_MonoSupport_31122020.csv",skip=2)%>%
   mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+# names(mono20) = names_mono
 mono21=fread("data/Mono/PM_ALM_MonoSupport_31122021.csv",skip=2)%>%
   mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
-
-multi20=fread("data/Multi/PM_ALM_Multisupports_31122020.csv",skip=2)
-
-mono20=fread("data/Mono/PM_ALM_MonoSupport_31122020.csv",skip=2)%>%
-  mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
-mono21=fread("data/Mono/PM_ALM_MonoSupport_31122021.csv",skip=2)%>%
-  mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+# names(mono20) = names_mono
 
 
 
 ```
 
+On peut faire une jointure entre les différentes années, mais il semble que les numéros de polices n'ont pas été bien anonymisés. C'est à dire que le police 1000 de l'année 2019 ne correspond pas à la police 1000 de l'année 2020. donc on ne peut pas étudier l'évolution.
+
+
+```{r,eval=FALSE}
+mono20[115098]
+mono19[115098]
+
+```
+
+## Fichiers multi
+
+Problème de format a priori. Il faudrait refaire les extractions...
+Mais si c'est justement ça le problème, alors il est possible aussi de nettoyer les données pour avoir un format exploitable.
+
+```{r,eval=FALSE}
+multi20=fread("data/Multi/PM_ALM_Multisupports_31122020.csv",skip=3)
+multi21=fread("data/Multi/PM_ALM_Multisupports_31122021.csv",skip=3)
+
+```
+
+## Rentes
+
+On peut créer une boucle pour importer les fichier efficacement et effectuer quelques nettoyages.
+
+```{r}
+names_rentes=c("CodeProduit", "NoPolice", "NoAvenant", "Type_de_Police", "Filler", 
+"AnneeEcheance", "TauxTechnique", "PM_Vie", "Capital_Vie", "Annee_Jce_rente", 
+"AnneeNais1", "Sexe1", "Date_Dernier_Versement", "Montant_Dernier_Versement", 
+"Periodicite_Versement", "Date_Dernier_Arrerage", "Periodicite_Arrerages", 
+"Taux_croissance_rente", "TauxReversion", "AnneeNais2", "Sexe2", 
+"Annee_Jce2", "Nature_Autre_Risque", "Annee_jouissance_autre_risque", 
+"Provision_autre_risque", "Capital_Garanti", "Taux_technique_autre_risque", 
+"Prop_vers_autre_risque", "Version")
+
+rente19=fread("data/Rente/PM_ALM_RMC_Reserve_31122019.csv",skip=2)
+names(rente19)=names_rentes
+rente19=rente19%>%
+  mutate(anneedif=Annee_Jce_rente-AnneeNais1)
+rente20=fread("data/Rente/PM_ALM_RMC_Reserve_31122020.csv",skip=2)
+names(rente20)=names_rentes
+rente21=fread("data/Rente/PM_ALM_RMC_Reserve_31122021.csv",skip=2)
+
+names(rente21)=names_rentes
+
+```
+
+
+# Nettoyage simple des données
+
+## Mono
+
+On peut afficher un résumé statistique des données.
 
 ```{r}
 summary(mono19)
 ```
+
+On peut supprimer les variables qui sont manquantes partout.
 
 ```{r}
 
@@ -68,121 +135,258 @@ summary(mono19)
 ```
 
 
-```{r}
-mono19[, colnames(mono19)[colSums(is.null(mono19)) == nrow(mono19)] := NULL]
+# Analyses exploratoires
 
-mono19[, apply(mono19, 2, function(x) any(!as.character(x) == "null")), drop = FALSE] 
+## Mono
 
-is.null(data.frame(mono19))
+### CodeProduit
 
-subset(mono19, select = -which(colSums(is.null(mono19)) == nrow(mono19)))
-
-```
-
+On peut effectuer des analyses exploratoires classiques, et créer un tableau de bord de façon automatique. voir l'exemple html. Des fichiers html peuvent être rassembler pour créer un site internet. Et l'avantage des fichiers statiques, c'est qu'ils peuvent être déposés dans un dossier de serveur, accessible à tous par un navigateur web classique. En apparence, c'est un site web.
 
 
 
 ```{r}
-mono20[is.na(PM_ALM)]
-
-mono20[115095]
-
-mono=merge(mono19,mono20,by="NoPolice")
-
-names(mono19)==
-names(mono20)
-
-dim(mono19)
-dim(mono20)
-
-
-
+mono19[,.(.N,PM_ALM=sum(PM_ALM)),by=CodeProduit]
 ```
 
+### Année de naissance
 
-```{r}
-mono19[,.N,by=Matricule]
+On peut prendre l'exemple de l'année de naissance. On peut déjà trouver quelques anomalies, mais l'idée bien sûr, c'est faire mieux que juste les valeurs extrêmes.
 
-
-
-mono19$taux2020=mono19$Valeur.2020/mono19$Valeur.2019-1
-
-hist(mono19[CODE=="R0005"]$taux2020)
-
-
-
-sal=mono19[CODE %in% c("T0004","R0005"),c("Matricule","Genre","CODE","Début","Fin","Date.de.Naissance","Grille","Valeur.2019")]%>%
-  pivot_wider(names_from = "CODE",values_from ="Valeur.2019")%>%
-  mutate(sal_hor=R0005/T0004)%>%
-  filter(is.na(sal_hor)==F)%>%
-  data.table()
-
-hist(sal$sal_hor,nclass=100)
-
-sal[,.N,by="Grille"]
-
-ggplot(sal,aes(Date.de.Naissance,sal_hor,color=as.factor(Genre)))+ geom_point()
-ggplot(sal,aes(Date.de.Naissance,sal_hor,color=as.factor(Grille)))+ geom_point()
-
-min(sal$sal_hor)
-
-mono19[CODE %in% c("T0004","R0005"),c("Matricule","Genre","CODE","Valeur.2019")][,.N,by=Matricule]
-
-mono19[CODE %in% c("T0004","R0005") & Matricule=="65",c("Matricule","Genre","CODE","Valeur.2019")]
-
-
-
-mono19[ CODE %in% c("T0004","R0005") &Matricule=="65",]
-
-unique(mono19)
-
-
-
-```
-
-
-
-```{r}
-multi20=fread("data/Multi/PM_ALM_Multisupports_31122020.csv",skip=3)
-
-
-r19=fread("data/Rente/PM_ALM_RMC_Reserve_31122019.csv",skip=2)
-
-ggplot(r19,aes(Provision_autre_risque,Capital_Garanti))+geom_point()
-
-
-```
-
-Année de naissance
-
-min trop faible
+min de l'année de naissance (il y a potentiellement un problème) :
 
 ```{r}
 min(mono20$AnneeNaissanceAssure)
+```
+
+Max de l'année de naissance : 
+
+```{r}
 max(mono20$AnneeNaissanceAssure)
 
+```
+
+On peut faire un histogramme
+
+```{r}
 hist(mono20$AnneeNaissanceAssure)
 ```
 
-NoPolice ne correspond pas, donc on ne peut pas étudier l'évolution
+On peut faire un boxplot. Mais les "anomalies" statistiques ne sont peut-être pas vraiment des anomalies. Cependant ce la donne une idée.
 
 ```{r}
-mono20[115098]
-mono19[115098]
-
-mono19[,.N,by=TypeDePolice]
-
-
-mono19[,.N,by=TauxChargementSurEncours]
+boxplot(mono20$AnneeNaissanceAssure)
 ```
+### AnneeNaissanceAssure& PM_ALM
 
 
 ```{r}
-mono20$PM_ALM
 
 ggplot(mono20,aes(AnneeNaissanceAssure,PM_ALM,color=as.factor(SexeAssure)))+geom_point()
 
-plot(mono20$PM_ALM,mono20$AnneeNaissanceAssure)
+
+```
+
+### TauxChargementSurEncours
+
+
+```{r}
+mono19[,.N,by=TauxChargementSurEncours]
+
+```
+
+### AnneeFinGarantiePourTMG
+
+```{r}
+mono19[,.N,by=AnneeFinGarantiePourTMG]
+
+```
+
+
+### AnneeFinGarantiePourTMG XTauxChargementSurEncours
+
+Je ne sais pas s'il y a des relations à respecter. Des analyses exploratoires simples peuvent permettre de mettre en évidence des anomalies déterministes.
+
+
+```{r}
+mono19[,.N,by=c("AnneeFinGarantiePourTMG","TauxChargementSurEncours")]%>%
+  spread(TauxChargementSurEncours,N)
+```
+
+
+## Rentes
+
+### CodeProduit
+
+```{r}
+
+rente19[,.N,by=CodeProduit]
+
+```
+
+### PM_Vie
+
+histogramme inexploitable pour le moment, on verra les graphiques suivants, et il faudra peaufiner.
+
+
+```{r}
+
+ggplot(rente19[PM_Vie<2e7],aes(PM_Vie,colorSexe1=as.factor(Sexe1)))+
+  geom_density()
+
+
+```
+
+### Nuages de points
+
+
+```{r}
+
+ggplot(rente19,aes(Provision_autre_risque,Capital_Garanti))+geom_point()
+
+
+```
+
+```{r}
+ggplot(rente19,aes(PM_Vie,Capital_Vie))+geom_point()
+
+```
+
+```{r}
+ggplot(rente19,aes(Capital_Vie,Capital_Garanti))+geom_point()
+
+```
+
+
+# Détection d'anomalies
+
+## Mono
+
+### Test statistiques
+
+On peut effectuer des tests statistiques pour la date de naissance
+
+```{r}
+grubbs.test(mono20$AnneeNaissanceAssure)
+```
+
+On peut examiner les dossiers correspondant aux valeurs extrêmes.
+
+### Scores d'anomalie
+
+pour mono, on prend la date de naissance comme exemple dans un premier temps
+
+```{r}
+library(isotree)
+data_isof=matrix(mono20$AnneeNaissanceAssure)
+model <- isolation.forest(data_isof, ndim=1, ntrees=10, nthreads=1)
+
+scores_isof <- predict(model, data_isof, type="avg_depth")
+
+mono20$s1=scores_isof
+
+ggplot()+geom_point(data=mono20,aes(AnneeNaissanceAssure,s1))
+
+```
+
+
+pour une variable, c'est pas sorcier, mais on peut appliquer la méthode à plusieurs variables. Ici deux:
+
+```{r}
+library(isotree)
+data_isof=as.matrix(data.frame(mono20[,c("AnneeNaissanceAssure","PM_ALM"),with = F]))
+model <- isolation.forest(data_isof, ndim=1, ntrees=10, nthreads=1)
+
+scores <- predict(model, data_isof, type="avg_depth")
+mono20$score=scores
+ggplot(mono20,aes(AnneeNaissanceAssure,PM_ALM,color=score)) + geom_point()
+
+
+```
+
+
+## Rentes
+
+### Scores d'anomalies Rentes
+
+Pour les rentes, on peut appliquer à plusieurs variables : "PM_Vie","Capital_Vie","AnneeNais1","Provision_autre_risque","Capital_Garanti" et. Mais pour la visualisation, on choisit deux variables.
+
+Bien sûr, on peut ordonner les données selon le score pour repérer les anomalies.
+
+```{r}
+library(isotree)
+data_isof=as.matrix(data.frame(rente19[,c("PM_Vie","Capital_Vie","AnneeNais1","Provision_autre_risque","Capital_Garanti"),with = F]))
+
+model <- isolation.forest(data_isof, ndim=1, ntrees=10, nthreads=1)
+
+scores <- predict(model, data_isof, type="avg_depth")
+rente19$score=scores
+
+ggplot(rente19,aes(PM_Vie,Capital_Vie,color=score)) + geom_point()
+
+
+```
+
+
+
+
+# Autres illustrations
+
+
+```{r}
+library(datasets)
+
+library(dbscan)
+
+n <- 100
+x <- cbind(
+  x=runif(10, 0, 5) + rnorm(n, sd = 0.4),
+  y=runif(10, 0, 5) + rnorm(n, sd = 0.4)
+  )
+### calculate LOF score with a neighborhood of 3 points
+lof <- lof(x, minPts = 3)
+
+
+```
+
+```{r}
+model <- isolation.forest(x, ndim=1, ntrees=10, nthreads=1)
+scores <- predict(model, x, type="avg_depth")
+```
+
+```{r}
+df=data.table(x)
+df$score1 = lof
+df$score2=scores
+```
+
+```{r}
+ggplot()  + geom_point(data=df,aes(x,y))+ 
+  geom_point(data=df,aes(x,y,size=score1),pch=1,color="red") + 
+  labs(title =" plus ce score est grand, plus le data point est une anomalie")
+```
+
+```{r}
+
+ggplot()  + geom_point(data=df,aes(x,y))+ 
+  geom_point(data=df,aes(x,y,size=score2),pch=1,color="red") + 
+  labs(title =" plus ce score est petit, plus le data point est une anomalie")
+```
+
+
+```{r,eval=FALSE}
+### point size is proportional to LOF and mark points with a LOF > 2
+plot(x, pch = ".", main = " ", asp = 1)
+points(x, cex = (lof - 1) * 2, pch = 1, col = "red")
+text(x[lof > 2,], labels = round(lof, 1)[lof > 2], pos = 3)
+```
+
+```{r,eval=FALSE}
+
+### distribution of outlier factors
+summary(lof)
+hist(lof, breaks = 10, main = " ")
+
 ```
 
 

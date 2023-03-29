@@ -1,0 +1,80 @@
+---
+title: "Tableau de bord"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+---
+
+```{r,eval=FALSE}
+library(DT)
+
+install.packages("DT")
+
+pacman::p_load(DT,plotly)
+
+data <- read.csv2("http://dataks.bitbucket.io/ml/insurance2.csv")
+insurance = data
+
+# getwd()
+
+# data=read.csv2("data/insurance.csv",sep=",")
+
+rmarkdown::render("dashboard.Rmd",
+                  output_dir = "output",
+                  quiet = T)
+
+```
+
+# Mono
+
+## Row {.tabset}
+
+### CodeProduit
+
+
+```{r}
+library(DT)
+library(tidyverse)
+
+mono19[,.(.N,Total_PM_ALM=sum(PM_ALM),Moyenne_PM_ALM=mean(PM_ALM)),by=CodeProduit] %>% datatable()%>%
+  formatCurrency("Total_PM_ALM",currency = " €",before = F,digits = 0, mark = " ")
+
+```
+# Rentes
+
+## Row {.tabset}
+
+### CodeProduit
+
+```{r}
+rente19[,.(.N,Total_PM_Vie=sum(PM_Vie),Total_Capital_Vie=sum(Capital_Vie)),by=CodeProduit] %>% datatable()%>%
+  formatCurrency("Total_PM_Vie",currency = " €",before = F,digits = 0, mark = " ")
+
+```
+
+### Graphique statique
+
+```{r}
+p = ggplot(rente19,aes(PM_Vie,Capital_Vie,color=as.factor(Sexe1)))+geom_point()
+p
+```
+
+### Graphique interactif
+
+Il possible de mettre des labels pour retrouver les dossiers plus rapidement
+
+```{r}
+ggplotly(p)
+
+```
+
+# Documentation
+
+## row {.tabse}
+
+### Sources de données
+
+
+lien pour les données
+
+

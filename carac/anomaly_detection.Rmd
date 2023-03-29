@@ -1,0 +1,164 @@
+---
+title: "Détection d'anomalies"
+author: "Kezhan SHI"
+date: '2023-03-29'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Ch. 1 - Statistical outlier detection
+
+Le code ci-dessus permet de réaliser différentes analyses pour détecter des anomalies dans des données en utilisant le langage R. Les bibliothèques "stats" et "graphics" sont chargées au début du code.
+
+Le jeu de données "river" est ensuite exploré avec la fonction "head" et la fonction "summary" pour obtenir des informations sur la variable "nitrate". Un boxplot est réalisé pour la variable "temperature" avec la fonction "boxplot".
+
+Pour détecter des anomalies, la fonction "grubbs.test" est utilisée. Elle permet de tester si un point est aberrant. Les résultats sont présentés sous la forme d'un test statistique indiquant si le point est considéré comme aberrant ou non.
+
+La détection de points aberrants multiples est également abordée avec l'exemple de la variable "nitrate" du jeu de données "river". La fonction "which.max" est utilisée pour trouver l'indice du point ayant la plus grande valeur. Ensuite, une deuxième analyse avec la fonction "grubbs.test" est réalisée en excluant ce point. Les résultats indiquent si ce point doit être considéré comme aberrant ou non.
+
+```{r}
+#Chargement de la bibliothèque
+library(stats)
+library(graphics)
+
+#Exploration des données
+head(river)
+summary(river$nitrate)
+
+#Boxplot de la variable temperature
+boxplot(temperature, ylab = "Celsius")
+
+#Histogramme de la variable nitrate
+hist(river$nitrate, xlab = "Nitrate concentration", breaks = 40)
+
+#Test de Grubbs pour détecter un point aberrant dans la variable temperature
+grubbs.test(temperature)
+
+#Test de Grubbs pour détecter un point aberrant dans la variable nitrate
+grubbs.test(river$nitrate)
+
+#Détection de points aberrants multiples
+which.max(river$nitrate)
+grubbs.test(river$nitrate[-156])
+max(river$nitrate[-156])
+
+```
+
+
+# KNN et LOF
+
+```{r}
+# Exploring wine
+head(wine)
+plot(pH ~ alcohol, data = wine)
+
+# kNN distance matrix
+wine_nn <- get.knn(wine, k = 5)
+head(wine_nn$nn.dist)
+wine_nn$nn.dist[5, 1]
+wine_nn$nn.ind[5, 1]
+wine[c(5, 1751), ]
+
+# kNN distance score
+wine_nn <- get.knn(wine, k = 5)
+wine_nnd <- rowMeans(wine_nn$nn.dist)
+which.max(wine_nnd)
+
+# Visualizing kNN distance
+plot(wine_nnd, pch = 20)
+
+# Standardizing features
+wine_scaled <- scale(wine)
+
+# Appending the kNN score
+wine$score <- wine_nnd
+
+# Visualizing kNN distance score
+plot(pH ~ alcohol, data = wine, cex = sqrt(score), pch = 20)
+
+# LOF calculation
+wine_lof <- lof(scale(wine), k = 5)
+wine$score <- wine_lof
+
+# LOF visualization
+plot(pH ~ alcohol, data = wine, cex = score, pch = 20)
+
+# LOF vs kNN
+wine_scaled <- scale(wine)
+wine_nn <- get.knn(wine_scaled, k = 5)
+wine$knn_score <- rowMeans(wine_nn$nn.dist)
+
+```
+
+# Isolation forest
+
+```{r}
+# Build an isolation tree 
+wine_tree <- iForest(wine, nt = 1)
+
+# Create isolation score
+wine$tree_score <- predict(wine_tree, newdata = wine)
+
+# Histogram plot of the scores
+hist(wine$tree_score, breaks = 40)
+
+```
+
+```{r}
+# Fit isolation forest
+wine_forest <- iForest(wine, nt = 100)
+# Fit isolation forest
+wine_forest <- iForest(wine, nt = 100, phi = 200)
+# Fit isolation forest
+wine_forest <- iForest(wine, nt = 100, phi = 200)
+
+# Create isolation score from forest
+wine_score <- predict(wine_forest, newdata = wine)
+
+# Append score to the wine data
+wine$score <- wine_score
+
+```
+
+```{r}
+# View the contents of the wine scores
+head(wine_scores)
+##    trees_10 trees_100 trees_200 trees_500 trees_1000 trees_2000
+## 1 0.5182650 0.5443061 0.5386447 0.5315498  0.5274856  0.5278313
+## 2 0.4499686 0.4445050 0.4485685 0.4495496  0.4489324  0.4529206
+## 3 0.4340265 0.4358717 0.4343007 0.4331406  0.4331947  0.4356845
+## 4 0.4050908 0.4319684 0.4303714 0.4311672  0.4339464  0.4359655
+## 5 0.4347151 0.4381716 0.4351090 0.4335480  0.4363655  0.4398163
+## 6 0.4155559 0.4368569 0.4261294 0.4233282  0.4264659  0.4302045
+
+# Score scatterplot 2000 vs 1000 trees 
+plot(trees_2000 ~ trees_1000, data = wine_scores)
+
+# Add reference line of equality
+abline(a = 0, b = 1)
+
+```
+
+```{r}
+# Sequence of values for pH and alcohol
+ph_seq <- seq(min(wine$pH),  max(wine$pH), length.out = 25)
+alcohol_seq <- seq(min(wine$alcohol),  max(wine$alcohol), length.out = 25)
+
+# Create a data frame of grid coordinates
+wine_grid <- expand.grid(pH = ph_seq, alcohol = alcohol_seq)
+
+# Calculate isolation score at grid locations
+wine_grid$score <- predict(wine_forest, wine_grid)
+
+# Contour plot of isolation scores
+contourplot(score ~ pH + alcohol, data = wine_grid, region = TRUE)
+
+```
+
+
+
+# 
+
