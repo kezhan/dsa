@@ -1,0 +1,165 @@
+---
+title: "Analyse des fichiers"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r,eval=FALSE}
+pacman::p_load(data.table,tidyverse,rmarkdown,outliers,dbscan,knitr)
+library(stats)
+library(graphics)
+
+type_document=c("html_document","html2")
+type_document=c("revealjs::revealjs_presentation","revealjs_ma")
+type_document=c("pdf_document","pdf")
+type_document=c("beamer_presentation","beamer")
+
+######### render fichiers #############
+
+for (file in files1[1:3]){
+  render("test.Rmd",type_document[1],
+         encoding="UTF-8",
+         output_dir = type_document[2],
+         quiet = T)
+  
+}
+
+
+```
+
+# Programme
+
+- Apprendre à utiliser R et créer un tableau de bord
+- Appliquer des règles déterministes pour trouver des écarts à étudier
+- Détection d'anomalies de manière simple avec une variable
+- Détection d'anomalies avec des variables multiples (plusieurs méthodes voir illustration)
+- Prédiction pour une variable d'intérêt
+
+Le document est produit dans R Studio, et les résultats d'analyses sont affichés dans ce document. Mais le code R est caché.
+
+# Import des données
+
+## Fichiers mono
+
+On peut créer une boucle pour importer les fichier efficacement. Je montre le code R ici.
+
+```{r,eval=FALSE,echo=T}
+
+mono19=fread("data/Mono/PM_ALM_MonoSupport_31122019.csv",skip=2)%>%
+  mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+mono20=fread("data/Mono/PM_ALM_MonoSupport_31122020.csv",skip=2)%>%
+  mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+mono21=fread("data/Mono/PM_ALM_MonoSupport_31122021.csv",skip=2)%>%
+  mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+
+
+```
+
+
+```{r,eval=FALSE}
+
+
+mono19=fread("data/Mono/PM_ALM_MonoSupport_31122019.csv",skip=2)%>%
+  mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+ # names(mono19) = names_mono
+mono20=fread("data/Mono/PM_ALM_MonoSupport_31122020.csv",skip=2)%>%
+  mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+# names(mono20) = names_mono
+mono21=fread("data/Mono/PM_ALM_MonoSupport_31122021.csv",skip=2)%>%
+  mutate(PM_ALM=as.numeric(gsub(" ","",PM_ALM)))
+# names(mono20) = names_mono
+
+
+```
+
+On peut faire une jointure entre les différentes années, mais il semble que les numéros de polices n'ont pas été bien anonymisés. C'est à dire que le police 1000 de l'année 2019 ne correspond pas à la police 1000 de l'année 2020. donc on ne peut pas étudier l'évolution.
+
+
+```{r,eval=FALSE}
+mono20[115098]
+mono19[115098]
+
+```
+
+## Fichiers multi
+
+Problème de format a priori. Il faudrait refaire les extractions...
+Mais si c'est justement ça le problème, alors il est possible aussi de nettoyer les données pour avoir un format exploitable.
+
+```{r,eval=FALSE}
+multi20=fread("data/Multi/PM_ALM_Multisupports_31122020.csv",skip=3)
+multi21=fread("data/Multi/PM_ALM_Multisupports_31122021.csv",skip=3)
+
+```
+
+## Rentes
+
+On peut créer une boucle pour importer les fichier efficacement et effectuer quelques nettoyages.
+
+```{r}
+names_rentes=c("CodeProduit", "NoPolice", "NoAvenant", "Type_de_Police", "Filler", 
+"AnneeEcheance", "TauxTechnique", "PM_Vie", "Capital_Vie", "Annee_Jce_rente", 
+"AnneeNais1", "Sexe1", "Date_Dernier_Versement", "Montant_Dernier_Versement", 
+"Periodicite_Versement", "Date_Dernier_Arrerage", "Periodicite_Arrerages", 
+"Taux_croissance_rente", "TauxReversion", "AnneeNais2", "Sexe2", 
+"Annee_Jce2", "Nature_Autre_Risque", "Annee_jouissance_autre_risque", 
+"Provision_autre_risque", "Capital_Garanti", "Taux_technique_autre_risque", 
+"Prop_vers_autre_risque", "Version")
+
+rente19=fread("data/Rente/PM_ALM_RMC_Reserve_31122019.csv",skip=2)
+names(rente19)=names_rentes
+rente19=rente19%>%
+  mutate(anneedif=Annee_Jce_rente-AnneeNais1)
+rente20=fread("data/Rente/PM_ALM_RMC_Reserve_31122020.csv",skip=2)
+names(rente20)=names_rentes
+rente21=fread("data/Rente/PM_ALM_RMC_Reserve_31122021.csv",skip=2)
+
+names(rente21)=names_rentes
+
+```
+
+
+# Nettoyage simple des données
+
+## Mono
+
+On peut afficher un résumé statistique des données. C'est une fonction de base dans R. Les résultats ne sont pas bien formatés. On peut faire un tableau de bord plus "joli".
+
+```{r}
+summary(mono19)
+```
+
+On peut supprimer les variables qui sont manquantes partout.
+
+```{r}
+
+cols_to_delete <- colnames(mono19)[colSums(is.na(mono19)) == nrow(mono19)] # get the names of the columns that have only NA values
+
+set(mono19, j = cols_to_delete, value = NULL)
+
+summary(mono19)
+
+```
+
+
+# Analyses exploratoires
+
+## Mono
+
+### CodeProduit
+
+On peut effectuer des analyses exploratoires classiques, et créer un tableau de bord de façon automatique. voir l'exemple html. Des fichiers html peuvent être rassembler pour créer un site internet. Et l'avantage des fichiers statiques, c'est qu'ils peuvent être déposés dans un dossier de serveur, accessible à tous par un navigateur web classique. En apparence, c'est un site web.
+
+
+```{r}
+
+mono19[,.(.N,PM_ALM=sum(PM_ALM)),by=CodeProduit] %>% kable(format = "latex")
+
+```
