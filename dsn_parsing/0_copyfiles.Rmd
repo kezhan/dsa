@@ -1,0 +1,113 @@
+
+# Packages
+
+
+```{r}
+pacman::p_load(data.table,tidyverse,openxlsx,tidyr,
+               clipr,DT,scales,arrow)
+
+```
+
+```{r}
+mois_valeur="202301"
+mois_valeur="202302"
+```
+
+
+# Copie fichiers
+
+## CTIP
+
+```{r}
+path_archive_ctip="//frs2hassiardfe1/PCEXPORT/DSN/CTIP/IN/ARCHIVES/D0DS301S/"
+
+to_zip="//Ouranos/inter_services$/Lab_S2H/1_Data/dsn_fichiers/"
+
+zip_ctip=data.table(zip=list.files("//frs2hassiardfe1/PCEXPORT/DSN/CTIP/IN/ARCHIVES/D0DS301S",pattern=".zip"))
+
+# filtre sur le mois en cours
+zip_ctip[,mois:=paste0(substr(zip,9,12),
+                                  substr(zip,7,8))]
+
+zip_ctip=zip_ctip[mois==mois_valeur]
+
+# date pour mieux distinguer les fichiers
+zip_ctip[,date:=as.numeric(paste0(substr(zip,9,12),
+                                  substr(zip,7,8),
+                                  substr(zip,5,6)))]
+
+zip_ctip$chemin_complet=paste0(path_archive_ctip,zip_ctip$zip)
+
+zip_ctip=zip_ctip[order(-date)]
+
+```
+
+
+```{r}
+
+dir.create(paste0(to_zip,"CTIP/",mois_valeur), showWarnings = FALSE)
+
+# récupérer les fichiers existants
+
+to_zip_ctip_liste=list.files(paste0(to_zip,"CTIP/",mois_valeur),pattern=".zip")
+
+zip_ctip_run=zip_ctip[!zip %in% to_zip_ctip_liste]
+
+
+file.copy(zip_ctip_run$chemin_complet, paste0(to_zip,"CTIP/",mois_valeur), overwrite = FALSE )
+
+
+# file.copy(zip_ctip[mois==mois_valeur]$chemin_complet, paste0(to_zip,"CTIP/",mois_valeur), overwrite = FALSE )
+
+```
+
+
+## FNMF
+
+
+```{r}
+zip_fnmf=data.table(zip=list.files("//frs2hassiardfe1/PCEXPORT/DSN/FNMF/IN/ARCHIVES"))
+
+zip_fnmf$date=substr(zip_fnmf$zip,10,17)
+zip_fnmf$mois=substr(zip_fnmf$zip,10,15)
+
+zip_fnmf$chemin_complet=paste0("//frs2hassiardfe1/PCEXPORT/DSN/FNMF/IN/ARCHIVES/",zip_fnmf$zip)
+zip_fnmf[,.N,by="mois"]
+
+```
+
+
+```{r}
+dir.create(paste0(to_zip,"FNMF/",mois_valeur), showWarnings = T)
+file.copy(zip_fnmf[mois==mois_valeur]$chemin_complet, paste0(to_zip,"FNMF/",mois_valeur), overwrite = FALSE )
+
+```
+
+
+## SINTIA
+
+
+```{r}
+zip_sintia=data.table(zip=list.files("//frs2hassiardfe1/PCEXPORT/DSN/SINTIA/IN/ARCHIVES"))
+
+zip_sintia$date=substr(zip_sintia$zip,10,17)
+zip_sintia$mois=substr(zip_sintia$zip,10,15)
+
+zip_sintia$chemin_complet=paste0("//frs2hassiardfe1/PCEXPORT/DSN/SINTIA/IN/ARCHIVES/",zip_sintia$zip)
+
+zip_sintia[,.N,by="mois"]
+```
+
+
+```{r}
+dir.create(paste0(to_zip,"SINTIA/",mois_valeur), showWarnings = FALSE)
+file.copy(zip_sintia[mois==mois_valeur]$chemin_complet, paste0(to_zip,"SINTIA/",mois_valeur), overwrite = FALSE )
+
+```
+
+
+
+
+
+
+

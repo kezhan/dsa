@@ -1,0 +1,97 @@
+
+# Packages
+
+
+
+```{r}
+pacman::p_load(data.table,tidyverse,openxlsx,tidyr,
+               clipr,flexdashboard,DT,
+               rmarkdown,plotly,scales,arrow,
+               fontawesome)
+
+
+
+mois_valeur="202302"
+date_filtre=20230117
+
+```
+
+
+
+# Dézip
+
+
+## CTIP
+
+```{r}
+
+path_archive_ctip=paste0("data/zip/CTIP/",mois_valeur,"/")
+path_archive_ctip=paste0(to_zip,"CTIP/",mois_valeur,"/")
+
+# à voir si c'est vraiment utile de créer le sous-dossier avant
+to_dezip_ctip=paste0("data/dezip/CTIP/",mois_valeur)
+
+to_dezip_ctip=paste0("D:/dsn_fichiers/dezip/CTIP/",mois_valeur)
+
+dir.create(to_dezip_ctip, showWarnings = FALSE)
+
+
+zip_ctip=data.table(zip=list.files(path_archive_ctip,pattern=".zip"))
+
+zip_ctip[,date:=as.numeric(paste0(substr(zip,9,12),
+                                  substr(zip,7,8),
+                                  substr(zip,5,6)))]
+
+zip_ctip[,mois:=paste0(substr(zip,9,12),
+                       substr(zip,7,8))]
+
+zip_ctip$chemin_complet=paste0(path_archive_ctip,zip_ctip$zip)
+
+zip_ctip=zip_ctip[order(-date)]
+
+# on pourrait faire mieux en regardant ce qui est déjà dézippés
+for (fz in zip_ctip[date>=date_filtre]$zip){
+  unzip(paste0(path_archive_ctip,fz),
+        exdir=paste0(to_dezip_ctip,"/",sub("\\.zip$","",fz)))
+}
+
+
+```
+
+
+## FNMF
+
+```{r}
+
+# on modifie manuellement le mois
+
+path_archive_fnmf=paste0("data/zip/FNMF/",mois_valeur,"/")
+
+path_archive_fnmf=paste0(to_zip,"FNMF/",mois_valeur,"/")
+
+zip_fnmf=data.table(zip=list.files(path_archive_fnmf))
+
+zip_fnmf$date=as.numeric(substr(zip_fnmf$zip,10,17))
+zip_fnmf$mois=substr(zip_fnmf$zip,10,15)
+
+# zip_fnmf$chemin_complet=paste0("//frs2hassiardfe1/PCEXPORT/DSN/FNMF/IN/ARCHIVES/",zip_fnmf$zip)
+
+zip_fnmf[,.N,by="mois"]
+
+# on peut sélectionner une partie des fichiers
+
+
+to_dezip_fnmf=paste0("D:/dsn_fichiers/dezip/FNMF/",mois_valeur)
+dir.create(to_dezip_fnmf, showWarnings = FALSE)
+
+
+for (fz in zip_fnmf[date>=date_filtre]$zip){
+  untar(paste0(path_archive_fnmf,fz),
+        exdir=paste0(to_dezip_fnmf,"/",sub("\\.tar$","",fz)))
+}
+
+
+
+```
+
+

@@ -26,6 +26,8 @@ names(dep)
 
 plot(dep)
 
+
+
 dep_data=dep@data%>%
   data.table()
 

@@ -1,0 +1,552 @@
+
+# Packages
+
+```{r}
+.libPaths()
+```
+
+```{r}
+install.packages("pacman")
+install.packages("dplyr",dependencies = T)
+# install.packages("tidyr",dependencies = T)
+# install.packages("fansi",dependencies = T)
+
+install.packages("flexdashboard",dependencies = T)
+```
+
+```{r}
+pacman::p_load(data.table,tidyverse,openxlsx,tidyr,
+               clipr,flexdashboard,DT,
+               rmarkdown,plotly,scales,arrow,
+               fontawesome)
+
+
+options(DT.options = list(pageLength = 100, language = list(search = "Rechercher :"),
+                          dom = 'Bfrtip',
+                          buttons = c('copy', 'csv', 'excel')))
+
+
+mois_valeur="202301"
+date_filtre=20230117
+
+```
+
+
+
+# Dézip
+
+- On copie les fichiers sur le disque original sur notre dossier Lab (car depuis le PC en local, on ne peut pas se connecter sur ce disque)
+- puis on copie à la main les fichiers en local. comme les fichiers sont bien structurés, pas besoin de script (Q:\Lab_S2H\1_Data\dsn_fichiers)
+- puis on fait le dézippage en local
+
+
+## CTIP
+
+```{r}
+
+path_archive_ctip=paste0("data/zip/CTIP/",mois_valeur,"/")
+
+# à voir si c'est vraiment utile de créer le sous-dossier avant
+dir.create(paste0("data/dezip/CTIP/",mois_valeur), showWarnings = FALSE)
+
+zip_ctip=data.table(zip=list.files(path_archive_ctip,pattern=".zip"))
+
+zip_ctip[,date:=as.numeric(paste0(substr(zip,9,12),
+                                  substr(zip,7,8),
+                                  substr(zip,5,6)))]
+
+zip_ctip[,mois:=paste0(substr(zip,9,12),
+                       substr(zip,7,8))]
+
+zip_ctip$chemin_complet=paste0(path_archive_ctip,zip_ctip$zip)
+
+zip_ctip=zip_ctip[order(-date)]
+
+# on pourrait faire mieux en regardant ce qui est déjà dézippés
+for (fz in zip_ctip[date>=date_filtre]$zip){
+  unzip(paste0(path_archive_ctip,fz),
+        exdir=paste0("data/dezip/CTIP/",mois_valeur,"/",sub("\\.zip$","",fz)))
+}
+
+```
+
+
+la suite backup pour exploration et dezip avec df global
+
+```{r,eval=FALSE}
+# exploration
+zip_ctip[date>20220101,.N,by=date]%>%ggplot(aes(as.Date(as.character(date), "%Y%m%d"),N))+geom_line()
+
+zip_ctip[,.N,by=substr(date,7,8)][order(-N)]
+zip_ctip[,.N,by=date]
+```
+
+```{r}
+
+# on regarde ce qui existe déjà et on prend uniquement les dossiers qui ne sont pas encore dézippés
+ctip_dezip=data.table(dossier=list.files(paste0(path_dezip,"CTIP_dezip")))
+ctip_dezip[,date:=as.numeric(paste0(substr(dossier,9,12),
+                                  substr(dossier,7,8),
+                                  substr(dossier,5,6)))]
+ctip_dezip[order(-date)]
+
+zip_ctip_run=zip_ctip[date>20221001 & !zip %in% paste0(ctip_dezip$dossier,".zip")]
+
+for (fz in zip_ctip_run$zip){
+  unzip(paste0(path_archive_ctip,fz),
+        exdir=paste0(path_dezip,"CTIP_dezip/",sub("\\.zip$","",fz)))
+}
+
+```
+
+## FNMF
+
+```{r}
+
+# on modifie manuellement le mois
+mois_valeur
+path_archive_fnmf=paste0("data/zip/FNMF/",mois_valeur,"/")
+
+zip_fnmf=data.table(zip=list.files(path_archive_fnmf))
+
+zip_fnmf$date=as.numeric(substr(zip_fnmf$zip,10,17))
+zip_fnmf$mois=substr(zip_fnmf$zip,10,15)
+
+# zip_fnmf$chemin_complet=paste0("//frs2hassiardfe1/PCEXPORT/DSN/FNMF/IN/ARCHIVES/",zip_fnmf$zip)
+
+zip_fnmf[,.N,by="mois"]
+
+# on peut sélectionner une partie des fichiers
+
+
+for (fz in zip_fnmf[date>=date_filtre]$zip){
+  untar(paste0(path_archive_fnmf,fz),
+        exdir=paste0("data/dezip/FNMF/",mois_valeur,"/",sub("\\.tar$","",fz)))
+}
+
+```
+
+
+
+## Pour izy dsn
+
+test pour un fichier pour connaitre les fichiers sorties
+
+```{r}
+
+
+unzip("data/fichiers/Finalised/20211127_DSN_VIV_MENSU.zip",
+      exdir="data/fichiers/Finalised_dezip/20211127_DSN_VIV_MENSU")
+
+unzip("data/fichiers/Finalised/20211204_DSN_VIV_MENSU.zip",
+      exdir="data/fichiers/Finalised_dezip/20211204_DSN_VIV_MENSU")
+
+
+```
+
+## Nouvelle archive
+
+```{r}
+path.data="data/fichiers/archive/"
+
+lzip=list.files(paste0(path.data,"FNMF/"))
+length(lzip)
+
+for (fz in lzip){
+  untar(paste0(path.data,"FNMF/",fz),
+        exdir=paste0(path.data,"FNMF_dezip/",sub("\\.tar$","",fz)))
+
+}
+
+
+```
+
+
+## Dézipper
+
+Ordinateur 1
+
+```{r}
+path.data="data/"
+
+lzip=list.files(paste0(path.data,"carrefour_zip"),pattern = ".zip")
+length(lzip)
+```
+
+
+Dézip
+
+```{r}
+for (fz in lzip){
+  unzip(paste0(path.data,"carrefour_zip/",fz),
+        exdir=paste0(path.data,"carrefour_dezip"))
+
+}
+
+```
+
+
+
+# DF fichiers
+
+```{r}
+path.data="../../Documents/data/"
+
+path.data="data/"
+
+lfiles.dezip=list.files(paste0(path.data,"carrefour_dezip"))
+length(lfiles.dezip)
+
+```
+
+```{r}
+
+df.fichiers=data.table(fichier=lfiles.dezip)%>%
+  separate(fichier, c('global', 'type',"id","mois","date","heure"), sep="_",remove = F)
+
+df.fichiers$annee=substr(df.fichiers$mois,1,4)
+
+df.fichiers[,.N,by=c("type")]
+df.fichiers[,.N,by=c("type","annee")]
+
+
+```
+
+
+```{r}
+
+df.fichiers[type=="225001" & annee=="0171"]
+```
+
+
+
+
+# Etablissements pilotes
+
+
+## fichier
+
+```{r}
+
+pilotes=read.xlsx("data/dsn/pilotes.xlsx",
+              startRow = 1, colNames = TRUE,
+  rowNames = FALSE, detectDates = FALSE, skipEmptyRows = TRUE,
+  skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+  namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()%>%
+  mutate(SIRET=as.character(SIRET))
+
+names(pilotes)
+
+```
+
+
+
+## Copier fichiers Pilotes
+
+
+on copie les fichiers pour les établissements pilotes
+
+fichier voir nettaoyge, decla
+
+```{r}
+i=1
+decla_pilote$fichier[i]
+
+
+for (i in 1:nrow(decla_pilote)){
+  file.copy(paste0(path.data,"carrefour_dezip/",decla_pilote$fichier[i]),
+            paste0(path.data,"carrefour_pilote"))
+}
+
+
+```
+
+
+```{r}
+saveRDS(decla_pilote,file="decla_pilote.rds")
+```
+
+```{r}
+
+write_parquet(indiv, sink="indiv.parquet")
+saveRDS(indiv,file="indiv.rds")
+fwrite(indiv,file="indiv.csv")
+
+```
+
+# Sauvegarde Parquet
+
+```{r}
+
+list.dirs("data/Archive",recursive = F)
+
+list.files("data/Archive",recursive = F)
+
+```
+
+
+```{r}
+
+
+dossier_mois="data/Archive/FICHIERS_DSN_16-05-2018"
+
+
+list_fichiers=list.files(dossier_mois,recursive=T,full.names=F)
+list_chemins=list.files(dossier_mois,recursive=T,full.names=T)
+
+df_dossier_mois=data.table(chemincomplet=list_chemins,
+                              fichier=list_fichiers)
+
+f=df_dossier_mois$chemincomplet[1]
+
+
+dir.create(paste0("parquet/",dossier_mois, "/CTIP"), showWarnings = T, recursive = TRUE)
+dir.create(paste0("parquet/",dossier_mois, "/FNMF"), showWarnings = T, recursive = TRUE)
+dir.create(paste0("parquet/",dossier_mois, "/SINTIA"), showWarnings = T, recursive = TRUE)
+
+
+for (f in df_dossier_mois$chemincomplet){
+  
+  data_i=fread(f,header = F,quote="'")
+  
+  # data_i$V2=gsub("^\\b'|'\\b$", "", data_i$V2)
+  
+  write_parquet(data_i, sink=paste0("parquet/",f,".parquet"))
+  
+  # saveRDS(data_i,file=paste0("parquet/",f,".rds"))
+  
+}
+
+```
+
+
+
+
+# Suppressions dossiers
+
+un peu dangereux
+
+
+```{r}
+unlink("datatest/ok", recursive = TRUE)
+```
+
+
+
+# Grande boucle
+
+
+```{r}
+liste_zip_archive=list.files("data/Archive",recursive = F)
+
+archive_df=data.table(zip=liste_zip_archive,
+                      chemin=paste0("data/Archive/",liste_zip_archive),
+                      annee=substr(liste_zip_archive,20,23),
+                      mois=substr(liste_zip_archive,17,18))
+
+archive_info=file.info(archive_df$chemin)
+archive_info$chemin=rownames(archive_info)
+archive_df_info=merge(archive_df,archive_info,by="chemin")
+archive_df_info[annee=="2022"]$size%>%plot
+
+archive_df_info[,.(.N,size=sum(size)),by=c("annee","mois")]
+
+saveRDS(archive_df_info,file="archive_df_info.rds")
+fwrite(archive_df_info,file="archive_df_info.csv")
+
+```
+
+
+```{r}
+# liste
+lzip=archive_df[annee=="2022"]$zip
+fz=lzip[1]
+
+decla_archive=data.table()
+
+for (fz in lzip[40:52]){
+  # dezip
+  unzip(paste0("data/Archive/",fz),
+        exdir=paste0("data/Archive_dezip"))
+  
+  # lire les fichiers txt pour les convertir en parquet
+  dossier_mois=paste0("data/Archive_dezip/",substr(fz,1,23))
+  
+  list_fichiers=list.files(dossier_mois,recursive=T,full.names=F)
+  list_chemins=list.files(dossier_mois,recursive=T,full.names=T)
+  
+  df_dossier_mois=data.table(chemincomplet=list_chemins,
+                             fichier=list_fichiers)
+  
+  # f=df_dossier_mois$chemincomplet[1]
+  
+  dir.create(paste0("parquet/",dossier_mois, "/CTIP"), showWarnings = T, recursive = TRUE)
+  dir.create(paste0("parquet/",dossier_mois, "/FNMF"), showWarnings = T, recursive = TRUE)
+  dir.create(paste0("parquet/",dossier_mois, "/SINTIA"), showWarnings = T, recursive = TRUE)
+  
+  
+  for (f in df_dossier_mois$chemincomplet){
+    
+    data_i=fread(f,header = F,quote="'")
+        # data_i$V2=gsub("^\\b'|'\\b$", "", data_i$V2)
+    
+    df_i <- data_i[V1 %in% lvar_l[["decla"]]]
+    # df_i[V1=="S20.G00.05.001"]
+    # df_i[,.N,by=V1]
+    
+    df_i$groupid <- cumsum(df_i$V1 == "S20.G00.05.001")
+    df_i[ , `:=`( freq = .N , newid = paste(groupid, 1:.N) ) , by=.(groupid, V1) ]
+    df_selec <- dcast(df_i, groupid + newid ~ V1, value.var = "V2")
+    df_selec[, c("newid","groupid") := NULL]
+    
+
+    if (is.null(df_selec)!=T){
+      df_selec$fichier=f
+      
+      decla_archive=rbind(decla_archive,df_selec,fill=T)
+    }
+    
+    
+    # write_parquet(data_i, sink=paste0("parquet/",f,".parquet"))
+    
+    saveRDS(data_i,file=paste0("parquet/",f,".rds"))
+    
+  }
+  
+}
+
+saveRDS(decla_archive,file="decla_archive_2022_40_52.rds")
+
+```
+
+## Nommage
+
+```{r}
+decla_archive=readRDS(file="decla_archive_2022.rds")
+
+tempn=names(decla_archive)
+tempn=tempn[tempn!="fichier"]
+decla_archive=decla_archive[,c(tempn,"fichier"),with=F]
+
+tempn.df=dicFields[V1 %in% tempn] %>%
+  slice(match(tempn, V1))
+
+names(decla_archive)=c(tempn.df$Comment,
+                       "fichier")
+
+decla_archive=decla_archive%>%
+  mutate(Etablissement.Siret=paste0(Entreprise.Siren,
+                                    Etablissement.Nic),
+         Entreprise.Siret=paste0(Entreprise.Siren,
+                                 Entreprise.Nic),
+         Etablissement.EffectifFinPeriode=as.numeric(Etablissement.EffectifFinPeriode),
+         Declaration.Mois=as.Date(Declaration.Mois,"%d%m%Y"))
+
+
+```
+
+## Exploration
+
+```{r}
+decla_archive[is.na(Declaration.Nature)]
+```
+
+```{r}
+rep_decla_archive=decla_archive[Declaration.Mois %in% c(as.Date("2022-01-01"),as.Date("2022-02-01"),
+                                                        as.Date("2022-03-01")) & 
+                                  Declaration.Type =="01",
+                                .N,by=c("Entreprise.Siren","Etablissement.Nic","Declaration.Mois")]%>%
+  spread(Declaration.Mois,N)
+
+rep_decla_archive[is.na(`2022-03-01`)]
+
+rep_decla_archive[is.na(`2022-02-01`) & is.na(`2022-03-01`)==F]
+
+```
+
+
+```{r}
+# déclarations pour 2017
+decla_archive[Entreprise.Siren=="343088134" & Etablissement.Nic=="00055"]
+
+decla_archive[Entreprise.Siren=="200040491" & Etablissement.Nic=="00017"]
+
+decla_archive[Entreprise.Siren=="329925010" & Etablissement.Nic=="07488"]
+
+```
+
+
+# Gestion Bolloré
+
+```{r}
+
+bolloresiren=read.xlsx("data/clients/2021_10_25 groupe BOLLORE - sous groupe  (amartinmar).xlsx",
+                    
+              startRow = 1, colNames = TRUE,
+  rowNames = FALSE, detectDates = FALSE, skipEmptyRows = TRUE,
+  skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+  namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()
+
+bolloresiren$SIREN
+
+```
+
+```{r}
+decla_archive_bollore=merge(decla_archive,bolloresiren[,c("SIREN","Sous-groupe.niveau.1",
+                                                          "Sous-groupe.niveau.2")],
+                            by.x="Entreprise.Siren",by.y="SIREN",all.y=T)
+```
+
+```{r}
+
+decla_archive_bollore[,.N,by=c("Declaration.Nature","Declaration.Mois")]
+
+decla_archive_bollore[,.N,by=Declaration.Mois]
+decla_archive_bollore[,.N,by=Declaration.Type]
+
+decla_archive_bollore[Declaration.Type=="01" & Declaration.Mois=="01032022",]
+
+info_archive_bollore=decla_archive_bollore[,c("fichier")]%>%
+  separate(fichier,into=c("p","dezip","fichier_date","type_concentrateur","fichier_nom"),sep="/",remove = F)
+
+info_archive_bollore[,.N,by=type_concentrateur]
+
+```
+
+
+
+# Prévoyance
+
+```{r}
+
+prevtest=read.xlsx("data/clients/prev_test_latifa.xlsx",
+              startRow = 1, colNames = TRUE,
+  rowNames = FALSE, detectDates = FALSE, skipEmptyRows = TRUE,
+  skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+  namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()
+
+prevtest$siret=substr(prevtest$siret_nom,1,14)
+
+```
+
+```{r}
+decla_archive_prev=merge(decla_archive,prevtest,
+                            by.x="Etablissement.Siret",by.y="siret",all.y=T)
+
+
+```
+
+
+
+```{r}
+
+decla_archive_prev[Declaration.Nature=="01" & Declaration.Type=="01"] %>%
+  write.xlsx(file="output/prev_latifa.xlsx")
+
+decla_archive_prev[is.na(Declaration.Nature),c("Client","Etablissement.Siret")]%>%
+  write.xlsx(file="output/prev_latifa_decla_non_trouvees.xlsx")
+
+```
+
+
+

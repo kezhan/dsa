@@ -1,0 +1,196 @@
+# Exploration test
+
+uniquement pour voir
+
+```{r}
+
+data_i=fread(paste0("SINTIA/",
+                    "CDDSN02E.202210059014423"),
+             header = F,quote="'")
+
+data_i$groupid <- cumsum(data_i$V1 == "S10.G00.00.001")
+
+data_i$rowid=1:nrow(data_i)
+
+data_i[V1 %in% c("S10.G00.00.001","S90.G00.90.002")]
+
+data_i[,.N,by=groupid]
+
+```
+
+
+# Boucle découpage
+
+```{r}
+
+lsintia=list.files(paste0("data/dezip/SINTIA/",mois_valeur))
+
+```
+
+```{r}
+
+gid=45
+f="CDDSN02E.202210067010282"
+
+for (f in lsintia){
+  data_i=fread(paste0("data/dezip/SINTIA/",mois_valeur,"/",f),header = F,quote="'")
+  
+  data_i$groupid <- cumsum(data_i$V1 == "S10.G00.00.001")
+  
+  for (gid in 1:max(data_i$groupid)){
+    data_ij=data_i[groupid==gid]
+    
+    dir.create(paste0("data/sintia_decoupage/",f),showWarnings = F)
+    
+    if (any(data_ij[V1=="S20.G00.05.001"]$V2=="01") &  
+        any(data_ij[V1=="S20.G00.05.002"]$V2 %chin% c("01","03","04")) & 
+        any(substr(data_ij[V1=="S21.G00.06.003"]$V2,1,2) !="78") & 
+        any(data_ij[V1=="S10.G00.00.005"]$V2 =="02")){
+      
+      data_ij$V2=paste0("'",data_ij$V2,"'")
+      fwrite(data_ij[,c("V1","V2"),with=F],file=paste0("data/sintia_decoupage/",f,"/",f,"_",gid,".txt"),col.names=F)
+    }
+  }
+}
+
+# on peut passer directement au zippage
+
+```
+
+
+```{r}
+# test condition
+
+data_ij[V1=="S20.G00.05.001"]$V2=="01"
+
+```
+
+```{r}
+data_ij$V2=paste0("'",data_ij$V2,"'")
+fwrite(data_ij[,c("V1","V2"),with=F],file="SINTIA_decoupage/sortie2.txt",col.names=F)
+
+```
+
+
+# Boucle decla
+
+on refait l'extraction pour être sûr
+pas obligatoire
+
+```{r}
+
+decla_sintia=data.table()
+
+for (f in lsintia){
+  data_i=fread(paste0("data/dezip/SINTIA/202210/",f),header = F,quote="'")
+  df_i <- data_i[V1 %in% lvar_l[["decla"]]]
+  
+  df_i$groupid <- cumsum(df_i$V1 == "S20.G00.05.001")
+  df_i[ , `:=`( freq = .N , newid = paste(groupid, 1:.N) ) , by=.(groupid, V1) ]
+  df_selec <- dcast(df_i, groupid + newid ~ V1, value.var = "V2")
+  #df_selec[, c("newid","groupid") := NULL]
+  
+  df_selec$fichier=f
+  
+  decla_sintia=rbind(decla_sintia,df_selec,fill=T)
+  
+}
+
+```
+
+```{r}
+saveRDS(decla_sintia,file="output/decla_sintia/202210.rds")
+
+decla_sintia[Emetteur.Siren=="817439599" & Emetteur.Nic=="00033"]
+
+decla_sintia[S10.G00.01.001=="817439599" & Emetteur.Nic=="00033"]
+
+```
+
+
+```{r}
+
+name="S20.G00.05.001"
+name="groupid"
+
+for (name in names(decla_sintia)){
+  
+  if (length(dicFields[V1==name]$Comment)!=0){
+    setnames(decla_sintia,old=name,dicFields[V1==name]$Comment)
+  }
+}
+
+```
+
+
+```{r}
+decla_sintia[,.N,by=Declaration.Nature]
+decla_sintia[,.N,by=c("Declaration.Nature","fichier")]
+decla_sintia[,.N,by=c("Declaration.Type","fichier")]
+
+
+```
+
+```{r}
+fwrite(decla_sintia,file="output/20221016_decla_sintia.csv",sep=";")
+```
+
+
+# Zippage
+
+
+## base fichiers
+
+```{r}
+# on déplace à la main si besoin, dossier à vérifier
+
+dsintia=list.files("data/sintia_decoupage/202301_1",recursive =T)
+dsintia=list.files("data/sintia_decoupage/202301_2",recursive =T)
+dsintia=list.files("data/sintia_decoupage/202301_3",recursive =T)
+
+dsintia=list.files("data/sintia_decoupage/202302",recursive =T)
+```
+
+```{r}
+
+dfichier_sintia=data.table(concentrateur="SINTIA",
+                          dossier=substr(dsintia,1,24),
+                          fichier=dsintia)
+
+dfichier_sintia[,chemin_complet:=paste0("data/sintia_decoupage/",mois_valeur,"/",fichier)]
+dfichier_sintia[,date:=substr(dossier,10,17)]
+
+dfichier_sintia[,.N,by=dossier]
+dfichier_sintia[,.N,by=date]
+
+```
+
+
+## Zippage
+
+```{r}
+dfichier_sintia[,.N,by=date]
+unique(dfichier_sintia$date)
+```
+
+```{r}
+dir.create(paste0("output/izy/",mois_valeur), showWarnings = FALSE)
+
+for (date_i in unique(dfichier_sintia$date)){
+  zip::zip(paste0("output/izy/",mois_valeur,"/",date_i,"_SINTIA.zip"),
+           files=dfichier_sintia[date==date_i]$chemin_complet,
+           mode = "cherry-pick")
+}
+
+```
+
+
+
+
+
+
+
+
+
+
+

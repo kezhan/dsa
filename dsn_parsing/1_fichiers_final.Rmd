@@ -1,0 +1,427 @@
+
+# Données
+
+## Dictionnaires
+
+```{r}
+
+dicFields=read.xlsx("param/dsn-datatypes-cahier-technique-2023.xlsx",sheet = "Fields",
+              startRow = 1, colNames = TRUE,
+  rowNames = FALSE, detectDates = FALSE, skipEmptyRows = TRUE,
+  skipEmptyCols = TRUE, rows = NULL, cols = NULL, check.names = FALSE,
+  namedRegion = NULL, na.strings = "NA", fillMergedCells = FALSE)%>%data.table()%>%
+  dplyr::mutate(V1=paste0(Block.Id,".",Id))
+
+names(dicFields)
+
+```
+
+## listes variables sélec
+
+```{r}
+lvar=names(dicFields)
+lvar=lvar[3:4]
+lvar="decla"
+
+lvar_l=list()
+lvar_vec=list()
+lindv=list()
+
+for (li in lvar){
+  
+  lvar_l[[li]]=dicFields[get(li)==1]$V1
+  nlist=rep("",length(lvar_l[[li]]))
+  names(nlist)=lvar_l[[li]]
+  
+  lvar_vec[[li]] = nlist
+  lindv[[li]]=data.table()
+}
+
+lvar_l[["decla"]]
+
+```
+
+
+
+# Données décla
+
+
+## CTIP
+
+```{r}
+dctip=list.files(paste0("data/dezip/CTIP/",mois_valeur),recursive =T)
+
+dctip=list.files(to_dezip_ctip,recursive =T)
+
+dfichier_ctip=rbind(data.table(concentrateur="CTIP",
+                               dossier=substr(dctip,1,31),
+                               fichier=dctip))
+
+dfichier_ctip[,date:=paste0(substr(dctip,9,12),
+                            substr(dctip,7,8),
+                            substr(dctip,5,6))]
+
+dfichier_ctip[,chemin_complet:=paste0("data/dezip/CTIP/",mois_valeur,"/",fichier)]
+```
+
+
+```{r}
+# Filtrer pour avoir les dates non retraitées
+
+dfichier_ctip=dfichier_ctip[date>=date_filtre]
+
+# fwrite(dfichier,file="output/20221016_dfichier.csv",sep=";")
+
+```
+
+
+```{r}
+
+
+dir.create(paste0("output/decla_ctip/",mois_valeur), showWarnings = FALSE)
+
+start_time <- Sys.time()
+
+# préciser le df dans condition for et le lien dans fread
+
+for (date_i in unique(dfichier_ctip$date)){
+  decla=data.table()
+  
+  dfichier_run=dfichier_ctip[date ==date_i]
+  
+  for (i in 1:nrow(dfichier_run)){
+    
+    data_i=fread(dfichier_run$chemin_complet[i],header = F,quote="'")
+    #print(i)
+    
+    #data_i$V2=gsub("^\\b'|'\\b$", "", data_i$V2)
+    
+    df_i <- data_i[V1 %in% lvar_l[["decla"]]]
+    df_i <- complete(df_i, V1=lvar_l[["decla"]])
+    
+    df_selec=data.table::transpose(df_i[,c("V2")])
+    
+    if (is.null(df_selec)!=T){
+      df_selec$fichier=dfichier_run$fichier[i]
+      decla=rbind(decla,df_selec)
+    }
+    
+  }
+  
+  names(decla)=c(dicFields[V1 %in% lvar_l[["decla"]]]$Comment,
+                 "fichier")
+  
+  saveRDS(decla,file=paste0("output/decla_ctip/",mois_valeur,"/ctip_",date_i,".rds"))
+}
+
+end_time <- Sys.time()
+end_time - start_time
+
+
+```
+
+
+### Concaténation
+
+```{r}
+# chemin_ctip_decla="Q:/Lab_S2H/1_Data/dsn_fichiers/ctip_decla/202210"
+chemin_ctip_decla=paste0("output/decla_ctip/",mois_valeur,"/")
+
+ldcl_ctip=list.files(chemin_ctip_decla)
+
+decla_ctip=data.table()
+
+for (li in ldcl_ctip){
+  decla_ctip_i=readRDS(paste0(chemin_ctip_decla,li))
+  decla_ctip=rbind(decla_ctip,decla_ctip_i)
+}
+
+saveRDS(decla_ctip,file="output/decla_ctip/ctip_202301.rds")
+
+
+```
+
+
+
+
+## FNMF par mois
+
+```{r}
+
+dfnmf=list.files(paste0("data/dezip/FNMF/",mois_valeur),recursive =T)
+
+dfichier_fnmf=data.table(concentrateur="FNMF",
+                          dossier=substr(dfnmf,1,24),
+                          fichier=dfnmf)
+
+dfichier_fnmf[concentrateur=="FNMF",date:=substr(dossier,10,17)]
+
+dfichier_fnmf[concentrateur=="FNMF",
+              chemin_complet:=paste0("data/dezip/FNMF/",mois_valeur,"/",fichier)]
+
+
+# fwrite(dfichier,file="output/20221016_dfichier.csv",sep=";")
+
+# filtre par date
+
+dfichier_fnmf=dfichier_fnmf[date>=date_filtre]
+
+dfichier_fnmf[,.N,by=date]
+
+```
+
+
+```{r}
+dfichier_fnmf
+
+i=1
+```
+
+
+### Par jour
+
+
+```{r}
+
+dir.create(paste0("output/decla_fnmf/",mois_valeur), showWarnings = FALSE)
+
+start_time <- Sys.time()
+
+# préciser le df dans condition for et le lien dans fread
+
+for (date_i in unique(dfichier_fnmf$date)){
+  decla=data.table()
+  
+  dfichier_run=dfichier_fnmf[date ==date_i]
+  
+  for (i in 1:nrow(dfichier_run)){
+    
+    data_i=fread(dfichier_run$chemin_complet[i],header = F,quote="'")
+    #print(i)
+    
+    #data_i$V2=gsub("^\\b'|'\\b$", "", data_i$V2)
+    
+    df_i <- data_i[V1 %in% lvar_l[["decla"]]]
+    df_i <- complete(df_i, V1=lvar_l[["decla"]])
+    
+    df_selec=data.table::transpose(df_i[,c("V2")])
+    
+    if (is.null(df_selec)!=T){
+      df_selec$fichier=dfichier_run$fichier[i]
+      decla=rbind(decla,df_selec)
+    }
+    
+  }
+  
+  names(decla)=c(dicFields[V1 %in% lvar_l[["decla"]]]$Comment,
+                 "fichier")
+  
+  saveRDS(decla,file=paste0("output/decla_fnmf/",mois_valeur,"/fnmf_",date_i,".rds"))
+}
+
+end_time <- Sys.time()
+end_time - start_time
+
+
+```
+
+### Concaténation
+
+```{r}
+
+chemin_fnmf_decla=paste0("output/decla_fnmf/",mois_valeur,"/")
+
+ldcl_fnmf=list.files(chemin_fnmf_decla)
+
+decla_fnmf=data.table()
+
+for (li in ldcl_fnmf){
+  decla_fnmf=rbind(decla_fnmf,readRDS(paste0(chemin_fnmf_decla,li)))
+}
+
+saveRDS(decla_fnmf,file="output/decla_fnmf/fnmf_202302_1.rds")
+
+
+```
+
+### pour tout
+
+```{r}
+start_time <- Sys.time()
+
+decla_fnmf=data.table()
+
+for (i in 1:nrow(dfichier_fnmf)){
+  
+  data_i=fread(paste0(dfichier_fnmf$chemin_complet[i]),header = F,quote = "'")
+  # data_i=fread(paste0(chemin_dossier,"20211127_DSN_VIV_MENSU_n0000001___FNMF_20211125000000_Original_784669954-DSSH01-1R1-WSLFsIRFbL2RJFOJJq2oZpF_DSN"),header = F)
+  
+  #print(i)
+  data_i$V2=gsub("^\\b'|'\\b$", "", data_i$V2)
+  
+  df_i <- data_i[V1 %in% lvar_l[["decla"]]]
+  df_i <- complete(df_i, V1=lvar_l[["decla"]])
+  
+  df_selec=data.table::transpose(df_i[,c("V2")])
+  
+  if (is.null(df_selec)!=T){
+    df_selec$fichier=dfichier_fnmf$fichier[i]
+    decla_fnmf=rbind(decla_fnmf,df_selec)
+  }
+  
+}
+
+end_time <- Sys.time()
+end_time - start_time
+
+
+names(decla_fnmf)=c(dicFields[V1 %in% lvar_l[["decla"]]]$Comment,
+              "fichier")
+
+saveRDS(decla_fnmf,file=paste0("output/decla_fnmf/fnmf_202302_test.rds"))
+
+
+```
+
+explorer pour un siret
+
+```{r}
+
+
+decla_fnmf[Entreprise.Siren=="817439599" & Etablissement.Nic=="00033",
+           .N,
+           by=Declaration.Mois]
+
+ci=decla_fnmf[Entreprise.Siren=="817439599" & Etablissement.Nic=="00033" &
+             Declaration.Mois=="01122022"]$chemin_complet
+ci
+data_i=fread(ci,header = F,quote = "'")
+
+data_i[V1 %in% c("S21.G00.51.011","S21.G00.51.013", "S21.G00.30.001")]%>%
+  pivot_wider(names_from =  V1,
+              values_from=V2)
+df_i=data_i[V1 %in% c("S21.G00.51.011","S21.G00.51.013", "S21.G00.30.001")]
+df_i$groupid <- cumsum(df_i$V1 == "S21.G00.30.001")
+df_i[ , `:=`( freq = .N , newid = paste(groupid, 1:.N) ) , by=.(groupid, V1) ]
+df_selec <- dcast(df_i, groupid + newid ~ V1, value.var = "V2")
+df_selec[, c("newid","groupid") := NULL]
+
+df_selec=fill(df_selec,S21.G00.30.001,.direction = "downup")
+
+df_selec[S21.G00.30.001=="1710214118109"]
+
+```
+
+
+```{r}
+decla_fnmf=decla
+```
+
+# Zip izy DSN
+
+- pour CTIP, on crée un fichier par date, et on reconcatène tout. On peut tout prendre dans ce fichier, qui sera un fichier contiendrait tout pour le mois.
+- Pour FNMF, on parse uniquement des fichiers postérieurs à une date, et la base contient uniquement des fichiers postérieurs à cette date. on pourrait créer un fichier par date aussi pour homogénéiser les fichiers.
+
+## CTIP
+
+on peut faire après une concaténation de l'ensemble des rds, et faire une boucle sur les dates.
+
+```{r}
+decla_ctip
+decla_ctip[,date:=paste0(substr(fichier,9,12),
+                         substr(fichier,7,8),
+                         substr(fichier,5,6))]
+
+chemin_ctip_dezip=paste0("data/dezip/CTIP/",mois_valeur,"/")
+
+decla_ctip$chemin_complet=paste0(chemin_ctip_dezip,decla_ctip$fichier)
+
+
+decla_ctip[,.N,by=date]
+decla_ctip[,.N,by=Declaration.Nature]
+decla_ctip[,.N,by=Envoi.EssaiReel]
+decla_ctip[,.N,by=Declaration.Mois]
+
+```
+
+
+```{r}
+decla_ctip_run=decla_ctip[Declaration.Nature=="01" & 
+             Declaration.Type %chin% c("01","03","04") & 
+             substr(Entreprise.Apen,1,2) !="78" &
+             Envoi.EssaiReel=="02"]
+
+
+decla_ctip_run[,.N,by=date]
+decla_ctip_run[,.N,by=Declaration.Nature]
+decla_ctip_run[,.N,by=Envoi.EssaiReel]
+decla_ctip_run[,.N,by=Declaration.Mois]
+
+```
+
+
+```{r}
+# date filtre à faire
+# car on reconcatène toutes les dates
+
+for (date_i in unique(decla_ctip$date)){
+  files_zip=decla_ctip[date==date_i & Declaration.Nature=="01" & 
+                         Declaration.Type %chin% c("01","03","04") & 
+                         substr(Entreprise.Apen,1,2) !="78" &
+                         Envoi.EssaiReel=="02"]$chemin_complet
+  
+  zip::zip(paste0("output/izy/202302/",date_i,"_CTIP.zip"),files=files_zip,mode = "cherry-pick")
+}
+
+
+```
+
+## FNMF
+
+
+```{r}
+decla_fnmf
+
+decla_fnmf[,date:=substr(fichier,10,17)]
+
+decla_fnmf[,chemin_complet:=paste0("data/dezip/FNMF/",mois_valeur,"/",fichier)]
+
+decla_fnmf_run=decla_fnmf[Declaration.Nature=="01" & 
+             Declaration.Type %chin% c("01","03","04") & 
+             substr(Entreprise.Apen,1,2) !="78" &
+             Envoi.EssaiReel=="02"]
+decla_fnmf_run
+
+```
+
+```{r}
+decla_fnmf[Declaration.Nature=="01" & 
+             substr(Entreprise.Apen,1,2) !="78" &
+             Envoi.EssaiReel=="02"]
+```
+
+```{r}
+decla_fnmf_run[,.N,by=date]
+decla_fnmf_run[,.N,by=Declaration.Nature]
+decla_fnmf_run[,.N,by=Envoi.EssaiReel]
+decla_fnmf_run[,.N,by=Declaration.Mois]
+```
+
+```{r}
+
+# on ne fait pas de filtres comme on ne fait pas par date.
+
+
+for (date_i in unique(decla_fnmf_run$date)){
+  
+  files_zip=decla_fnmf_run[date==date_i]$chemin_complet
+  
+  zip::zip(paste0("output/izy/",mois_valeur,"/",date_i,"_FNMF.zip"),
+           files=files_zip,mode = "cherry-pick")
+}
+
+
+```
+
+
+
